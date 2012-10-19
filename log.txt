@@ -2,3 +2,16 @@
 After most of the work is done, maybe add some gadget support :
 -Ternaries (bool) ? val1 : val2
 -floats digits.digits
+
+19/10
+Questions :
+- are successive identical declarations illegal ?
+"int a; int a;" "int a; char* a;"
+- do global variables reach before their declaration ?
+"int main(){ ... a=0; ... } int a;"
+- why is the testing instruction in a 'for' block optional when there is
+  no break ?
+"for (i=0;;i++)"
+- aren't all pointers the same size ?
+"sizeof(...***)"
+
