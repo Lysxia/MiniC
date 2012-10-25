@@ -4,55 +4,40 @@
 %{
   open Ast
   
-  (* *********************IGNORE*******************************
-  /* Variables are translated into numbers w_hile parsing */
-  /* Unbound variables are detected a_nd r_aise an e_xception*/
-  /* d_one because I dislike that syntaxic coloring o_f comments */
-  /* Local environment */
-  module Env = Map.Make(String)
+  let loc startpos endpos =
+    { start_p=startpos ; end_p=endpos }
 
-  /* Bound s_truct/union field names */
-  let su_field = Hashtbl.create 37
-  
-  let su_find =
-    Hashtbl.find su_field
+  let mk_pointer t n =
+    if n = 0 then t else Point (n,t) 
 
-  let su_add x =
-    try (Hashtbl.find su_field x)
-      with _ ->
-        Hashtbl.add su_field x (Hashtbl.length su_field)
-  
-  /* Bound global variable names */
-  let global = Hashtbl.create 37
+  let vstmt_of_var_list t {desc=n,x ;loc=loc} =
+    {desc=mk_pointer t n,x ; loc=loc}
 
-  let g_find =
-    Hashtbl.find global
-  
-  let g_add x =
-    try (Hashtbl.find global x)
-      with _ ->
-        Hashtbl.add global x (Hashtbl.length global)
-
-  /* Return following unassigned integer */
-  let g_num () = Hashtbl.length global
-  *************************************************************)
-
-  let make_e startpos endpos e =
-    { edesc=e ;
-      e_start=startpos ;
-      e_end=endpos }
-
-  let make_i startpos endpos i =
-    Loc {
-      idesc=i ;
-      i_start=startpos ;
-      i_end=endpos }
-
-  let make_s startpos endpos s =
-    { sdesc=s ;
-      s_start=startpos ;
-      s_end=endpos }
-
+  let while_of_for e1 e2 e3 i loc =
+    let bool_optexpr = function
+      | None -> { desc=Cint 1 ; loc=loc }
+      | Some e -> e
+    in
+    Bloc ([],
+      List.fold_right
+        ( fun e -> fun l -> Expr e::l )
+        e1
+        [
+          Instr
+          {
+            desc=While
+            (
+              bool_optexpr e2,
+              Instr 
+              { desc=Bloc (
+                  [], [i]@
+                  (List.map (fun e -> Expr e) e3)) ;
+                loc=loc }
+            ) ;
+            loc=loc
+          }
+        ]
+               ) 
 %}
 
 %token <int> CST
@@ -79,38 +64,33 @@
 
 %%
 prog:
-  statement*
-  EOF
+  stmt_list_rev EOF
   { List.rev $1 }
 
-statement:
-  | vstmt	{ make_s $startpos $endpos (Vars $1) }
-  | s=tstmt
-  | s=fstmt 	{ s }
+stmt_list_rev:
+  | /*EMPTY*/			{ [] }
+  | stmt_list_rev vstmt_list	{ (List.map (fun v -> V v) $2)@$1 }
+  | sl=stmt_list_rev s=tstmt
+  | sl=stmt_list_rev s=fstmt 	{
+      (Stmt { desc=s ; loc=loc $startpos(s) $endpos(s) })::sl }
 
-vstmt:
-  vdesc { { vdesc=$1 ; v_start=$startpos ; v_end=$endpos } }
-
-vdesc:
-  ty separated_nonempty_list(COMMA,var) SEMICOLON
-    { $1,$2 }
+vstmt_list:
+  | ty separated_nonempty_list(COMMA,var) SEMICOLON
+      { List.map (vstmt_of_var_list $1) $2 }
 
 tstmt:
-  | STRUCT IDENT LBRC vstmt* RBRC SEMICOLON
-    { make_s $startpos $endpos
-        (Typ (Struct $2, $4)) }
-  | UNION IDENT LBRC vstmt* RBRC SEMICOLON
-    { make_s $startpos $endpos
-        (Typ (Union $2, $4)) }
+  | STRUCT IDENT LBRC vstmt_list RBRC SEMICOLON
+    { Typ (Struct $2, $4) }
+  | UNION IDENT LBRC vstmt_list RBRC SEMICOLON
+    { Typ (Union $2, $4) }
 
 fstmt:
   t=ty count=star_count f=IDENT LPAR args=separated_list(COMMA,arg) RPAR
-    LBRC vslist=vstmt* ilist=instr* RBRC
-    { make_s $startpos $endpos
-        (Fct ((if count=0 then t else Point (count,t)),f,args,vslist,ilist)) }
+    LBRC vslist=vstmt_list ilist=instr* RBRC
+    { Fct (mk_pointer t count,f,args,vslist,ilist) }
 
 var:
-  star_count IDENT 	{ $1,$2 }
+  star_count IDENT 	{ {desc=$1,$2 ; loc=loc $startpos $endpos} }
 
 star_count:
   | /*EMPTY*/ 		{ 0 }
@@ -125,28 +105,30 @@ ty:
 
 arg:
   ty star_count IDENT
-    { (if $2 = 0 then $1 else Point ($2,$1)),$3 }
+    { { desc=mk_pointer $1 $2,$3 ; loc=loc $startpos $endpos } }
 
 expr:
-  edesc { { edesc=$1 ; e_start=$startpos ; e_end=$endpos } }
+  | edesc { { desc=$1 ; loc=loc $startpos $endpos } }
+  | LPAR expr RPAR		{ $2 }
 
 edesc:
-  | CST 		{ Cint $1 }
-  | STR 		{ Cstring $1 }
-  | IDENT		{ Ident $1 }
-  | expr DOT IDENT	{ Dot ($1,$3) }
-  | expr ARROW IDENT	{ Dot ((Unop (Star,$1)),$3) }
-  | expr LBKT expr RBKT	{ Unop (Star, Binop (Plus,$1,$3)) }
-  | expr ASSIGN expr	{ Assign ($1,$3) }
+  | CST 			{ Cint $1 }
+  | STR 			{ Cstring $1 }
+  | IDENT			{ Ident $1 }
+  | expr DOT IDENT		{ Dot ($1,$3) }
+  | expr ARROW IDENT
+      { Dot ( { desc=Unop (Star,$1) ; loc=loc $startpos($1) $endpos($1) },$3) }
+  | expr LBKT expr RBKT
+      { Unop (Star, { desc=Binop (Plus,$1,$3) ; loc=loc $startpos $endpos }) }
+  | expr ASSIGN expr		{ Assign ($1,$3) }
   | f=IDENT LPAR args=separated_list(COMMA,expr) RPAR
-			{ Call (f,args) }
+				{ Call (f,args) }
   | u=unop e=expr		{ Unop(u,e) }
-  | expr INCR		{ Unop(Incrs,$1) }
-  | expr DECR		{ Unop(Decrs,$1) }
+  | expr INCR			{ Unop(Incrs,$1) }
+  | expr DECR			{ Unop(Decrs,$1) }
   | e1=expr o=binop e2=expr	{ Binop(o,e1,e2) }
   | SIZEOF LPAR ty star_count RPAR
 		{ Sizeof (if $4=0 then $3 else Point ($4,$3)) }
-  | LPAR expr RPAR	{ $2 }
 
 %inline unop:
   | INCR	{ Incrp }
@@ -173,34 +155,19 @@ edesc:
   | OR  	{ Or }
 
 instr:
-  | SEMICOLON 		{ make_i $startpos $endpos Nop }
-  | expr SEMICOLON 	{ make_i $startpos $endpos (Expr $1) }
-  | IF LPAR expr RPAR instr		{ make_i $startpos $endpos
-					    (If ($3,$5,Instr Nop)) }
-  | IF LPAR expr RPAR instr ELSE instr	{ make_i $startpos $endpos
-                                            (If ($3,$5,$7)) }
-  | WHILE LPAR expr RPAR instr		{ make_i $startpos $endpos
-                                            (While ($3,$5)) }
+  | expr SEMICOLON	{ Expr $1 }
+  | idesc	{ Instr { desc=$1 ; loc=loc $startpos $endpos } }
+
+idesc:
+  | SEMICOLON		 		{ Nop }
+  | IF LPAR expr RPAR instr
+      { If ($3,$5,Instr {desc=Nop;loc=loc $endpos $endpos}) }
+  | IF LPAR expr RPAR instr ELSE instr	{ If ($3,$5,$7) }
+  | WHILE LPAR expr RPAR instr		{ While ($3,$5) }
   | FOR LPAR init=separated_list(COMMA,expr) SEMICOLON
       test=expr? SEMICOLON
       inc=separated_list(COMMA,expr) RPAR i=instr
-	{ make_i $startpos $endpos (Bloc ([],
-            (List.map (fun e -> Instr (Expr e)) init)@
-            [ Instr
-            (
-            While ((match test with
-                     | None ->
-                         make_e $startpos(test) $endpos(test) (Cint 1)
-                     | Some e -> e),
-                   (make_i $startpos(inc) $endpos(inc) (Bloc ([],
-                      (List.map
-                         (fun e -> Instr (Expr e)) inc)@
-                      [i])))
-                  )
-            )
-            ])) }
-  | LBRC vstmt* instr* RBRC 		{ make_i $startpos $endpos
-					    (Bloc ($2,$3)) }
-  | RETURN expr? SEMICOLON		{ make_i $startpos $endpos
-					    (Return $2) }
+	{ while_of_for init test inc i (loc $startpos $endpos) }
+  | LBRC vstmt_list instr* RBRC 		{ Bloc ($2,$3) }
+  | RETURN expr? SEMICOLON		{ Return $2 }
 

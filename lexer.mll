@@ -84,8 +84,9 @@ rule token = parse
   | "&&"	{ AND }
   | "||"	{ OR }
   | eof 	{ EOF }
-  | integer as n 	{ CST (int_of_string n) }
+  (* signed 32 bits integer in C vs signed 31 bit integer in OCaml...  *)
   | "0" octal+ as n 	{ CST (int_of_string ("0o"^n)) }
+  | integer as n 	{ CST (int_of_string n) }
   | "\"" car* as s "\""	{ STR s }
   | "/*"	{ comment lexbuf }
   | "//" [^ '\n'] 	{ token lexbuf }
