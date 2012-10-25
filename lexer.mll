@@ -27,14 +27,12 @@
       try List.assoc s kwd_tbl with _ -> IDENT s
 
   let newline lexbuf =
-    let pos = lexbuff.lex_curr_p in
-    lexbuff.lex_curr_p <-
+    let pos = lexbuf.lex_curr_p in
+    lexbuf.lex_curr_p <-
       { pos with
           pos_lnum = pos.pos_lnum + 1;
           pos_bol = pos.pos_cnum }
   
-  let char_num lexbuf =
-    lexbuff.lex_curr_p.pos_cnum - lexbuff.lex_curr_p.pos_bol
 }
 
 let space = [' ' '\t']
@@ -52,50 +50,50 @@ let car = (['\032'-'\127']#['\\' '\'' '"'])
           | ("\\x" hexa hexa)
 
 rule token = parse
-  | '\n'	{ newline lexbuf; token lexbuf }
-  | space+	{ token lexbuf }
+  | '\n'	{ newline lexbuf; token lexbuf }
+  | space+	{ token lexbuf }
   | ident as id	{ id_or_kwd id }
-  | '*' 	{ STAR }
+  | '*' 	{ STAR }
   | '(' 	{ LPAR }
   | ')' 	{ RPAR }
   | '[' 	{ LBKT }
   | ']' 	{ RBKT }
   | '{' 	{ LBRC }
   | '}' 	{ RBRC }
-  | ';' 	{ SEMICOLON }
+  | ';' 	{ SEMICOLON }
   | ',' 	{ COMMA }
   | '.' 	{ DOT }
-  | "->"	{ ARROW }
+  | "->"	{ ARROW }
   | '=' 	{ ASSIGN }
-  | "++"	{ INCR }
+  | "++"	{ INCR }
   | "--" 	{ DECR }
-  | '&' 	{ ADDRESS }
-  | '!' 	{ NOT }
-  | '+' 	{ PLUS }
-  | '-' 	{ MINUS }
-  | "=="	{ EQ }
-  | "!="	{ NEQ }
-  | '<' 	{ LT }
+  | '&' 	{ ADDRESS }
+  | '!' 	{ NOT }
+  | '+' 	{ PLUS }
+  | '-' 	{ MINUS }
+  | "=="	{ EQ }
+  | "!="	{ NEQ }
+  | '<' 	{ LT }
   | "<="	{ LEQ }
   | '>' 	{ GT }
   | "<="	{ GEQ }
-  | '/' 	{ DIV }
+  | '/' 	{ DIV }
   | '%' 	{ MOD }
-  | "&&"	{ AND }
-  | "||"	{ OR }
-  | eof 	{ EOF }
+  | "&&"	{ AND }
+  | "||"	{ OR }
+  | eof 	{ EOF }
   (* signed 32 bits integer in C vs signed 31 bit integer in OCaml...  *)
   | "0" octal+ as n 	{ CST (int_of_string ("0o"^n)) }
   | integer as n 	{ CST (int_of_string n) }
-  | "\"" car* as s "\""	{ STR s }
+  | "\"" car* as s "\"" { STR s }
   | "/*"	{ comment lexbuf }
   | "//" [^ '\n'] 	{ token lexbuf }
-  | "//" [^ '\n'] eof	{ EOF }
+  | "//" [^ '\n'] eof	{ EOF }
   | _ as c		{
-    raise (Lexing_error ("Illegal character: "^String.make c)) }
+    raise (Lexing_error ("Illegal character: "^String.make 1 c)) }
 
 and comment = parse
   | '\n'	{ newline lexbuf; comment lexbuf }
-  | "*/" 	{ token lexbuf }
-  | _   	{ comment lexbuf }
+  | "*/"	{ token lexbuf }
+  | _   	{ comment lexbuf }
   | eof 	{ raise (Lexing_error "Unterminated comment") }

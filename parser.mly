@@ -162,7 +162,7 @@ idesc:
   | SEMICOLON		 		{ Nop }
   | IF LPAR expr RPAR instr
       { If ($3,$5,Instr {desc=Nop;loc=loc $endpos $endpos}) }
-  | IF LPAR expr RPAR instr ELSE instr	{ If ($3,$5,$7) }
+  | IF LPAR expr RPAR instr ELSE instr 	{ If ($3,$5,$7) }
   | WHILE LPAR expr RPAR instr		{ While ($3,$5) }
   | FOR LPAR init=separated_list(COMMA,expr) SEMICOLON
       test=expr? SEMICOLON
