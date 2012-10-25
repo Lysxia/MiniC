@@ -1,3 +1,6 @@
+(** Mini-C Lexer **)
+(** Li-yao Xia **)
+
 {
   open Lexing
   open Parser
@@ -5,17 +8,17 @@
   exception Lexing_error of string
 
   let kwd_tbl =
-    ["char", CHAR;
-     "else", ELSE;
-     "for", FOR;
-     "if", IF;
-     "int", INT;
-     "return", RETURN;
-     "sizeof", SIZEOF;
-     "struct", STRUCT;
-     "union", UNION;
-     "void", VOID;
-     "while", WHILE]
+    ["char", 	CHAR;
+     "else", 	ELSE;
+     "for", 	FOR;
+     "if", 	IF;
+     "int", 	INT;
+     "return", 	RETURN;
+     "sizeof", 	SIZEOF;
+     "struct", 	STRUCT;
+     "union", 	UNION;
+     "void", 	VOID;
+     "while", 	WHILE]
 
   let id_or_kwd =
     let h = Hashtbl.create 17 in
@@ -60,9 +63,9 @@ rule token = parse
   | '{' 	{ LBRC }
   | '}' 	{ RBRC }
   | ';' 	{ SEMICOLON }
-  | ',' 	{ COLON }
+  | ',' 	{ COMMA }
   | '.' 	{ DOT }
-  | "->"	{ ARRW }
+  | "->"	{ ARROW }
   | '=' 	{ ASSIGN }
   | "++"	{ INCR }
   | "--" 	{ DECR }
@@ -81,10 +84,13 @@ rule token = parse
   | "&&"	{ AND }
   | "||"	{ OR }
   | eof 	{ EOF }
-  | integer as n { CST (int_of_string n) }
-  | "0" octal+ as n { CST (int_of_string ("0o"^n)) }
-  | "\"" car* as s "\"" { STR s }
-  | _ as c	{
+  | integer as n 	{ CST (int_of_string n) }
+  | "0" octal+ as n 	{ CST (int_of_string ("0o"^n)) }
+  | "\"" car* as s "\""	{ STR s }
+  | "/*"	{ comment lexbuf }
+  | "//" [^ '\n'] 	{ token lexbuf }
+  | "//" [^ '\n'] eof	{ EOF }
+  | _ as c		{
     raise (Lexing_error ("Illegal character: "^String.make c)) }
 
 and comment = parse
@@ -92,8 +98,3 @@ and comment = parse
   | "*/" 	{ token lexbuf }
   | _   	{ comment lexbuf }
   | eof 	{ raise (Lexing_error "Unterminated comment") }
-
-and line_comment = parse
-  | '\n'	{ newline lexbuf; token lexbuf }
-  | _   	{ token lexbuf }
-  | eof 	{ EOF }
