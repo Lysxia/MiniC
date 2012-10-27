@@ -47,8 +47,8 @@ type instr =
 and idesc =
   | Nop
   | If of expr*instr*instr
-  | While of expr*instr (* a for loop is a kind of while loop,
-the result will be the same, at least when there is no 'continue' *)
+  | While of expr*instr
+  | For of (expr list)*(expr option)*(expr list)*instr
   | Bloc of (vstmt list)*(instr list)
   | Return of (expr option)
 
