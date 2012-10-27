@@ -11,33 +11,8 @@
     if n = 0 then t else Point (n,t) 
 
   let vstmt_of_var_list t {desc=n,x ;loc=loc} =
-    {desc=mk_pointer t n,x ; loc=loc}
+    { desc=mk_pointer t n,x ; loc=loc }
 
-  let while_of_for e1 e2 e3 i loc =
-    let bool_optexpr = function
-      | None -> { desc=Cint 1 ; loc=loc }
-      | Some e -> e
-    in
-    Bloc ([],
-      List.fold_right
-        ( fun e -> fun l -> Expr e::l )
-        e1
-        [
-          Instr
-          {
-            desc=While
-            (
-              bool_optexpr e2,
-              Instr 
-              { desc=Bloc (
-                  [], [i]@
-                  (List.map (fun e -> Expr e) e3)) ;
-                loc=loc }
-            ) ;
-            loc=loc
-          }
-        ]
-               ) 
 %}
 
 %token <int> CST
@@ -167,7 +142,7 @@ idesc:
   | FOR LPAR init=separated_list(COMMA,expr) SEMICOLON
       test=expr? SEMICOLON
       inc=separated_list(COMMA,expr) RPAR i=instr
-	{ while_of_for init test inc i (loc $startpos $endpos) }
+	{ For (init,test,inc,i) }
   | LBRC vstmt_list instr* RBRC 		{ Bloc ($2,$3) }
   | RETURN expr? SEMICOLON		{ Return $2 }
 

@@ -1,19 +1,31 @@
 # Mini-C Compiler
 # Li-yao Xia
 #
-# 
-#
 
-parser_test.out : parser.ml ast.mli
-	ocamlc parser_test -o parser_test.out
+CMO=lexer.cmo parser.cmo parser_test.cmo
+GENERATED = lexer.ml parser.ml parser.mli
+BIN=parser_test
 
-main.ml : parser.ml lexer.ml ast.cmi
+$(BIN):$(CMO)
+	ocamlc -o $(BIN) $(CMO)
 
-parser.ml : parser.mly ast.cmi
-	menhir -v parser.mly
 
-lexer.ml : lexer.mll
-	ocamllex lexer.mll
+.SUFFIXES: .mli .ml .cmi .cmo .mll .mly
 
-ast.cmi : ast.mli
-	ocamlc -c ast.mli
+.mli.cmi:
+	ocamlc -c $<
+
+.ml.cmo:
+	ocamlc -c $<
+
+.mll.ml:
+	ocamllex $<
+
+.mly.ml:
+	menhir -v $<
+
+.depend depend:$(GENERATED)
+	rm -f .depend
+	ocamldep *.ml *.mli > .depend
+
+include .depend

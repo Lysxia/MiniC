@@ -63,4 +63,4 @@ and sdesc =
 
 type file = stmt list
 
-exception Error of location * string
+exception Parse_error of location * string

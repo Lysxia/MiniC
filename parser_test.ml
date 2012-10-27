@@ -92,7 +92,7 @@ let print_ast =
   List.iter print_stmt
 
 let () =
-  for i = 1 to Array.length Sys.argv do
+  for i = 1 to Array.length Sys.argv - 1 do
     Printf.printf "File %s\n" Sys.argv.(i);
     let h = open_in Sys.argv.(i) in
     print_ast (Parser.prog Lexer.token (Lexing.from_channel h));
