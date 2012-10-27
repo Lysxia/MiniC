@@ -4,6 +4,7 @@
 
 CMO=lexer.cmo parser.cmo parser_test.cmo
 GENERATED = lexer.ml parser.ml parser.mli
+PARSER_GEN = parser.automaton parser.conflicts
 BIN=parser_test
 
 $(BIN):$(CMO)
@@ -27,5 +28,8 @@ $(BIN):$(CMO)
 .depend depend:$(GENERATED)
 	rm -f .depend
 	ocamldep *.ml *.mli > .depend
+
+clean:
+	rm -f *.cm[io] *.o *~ $(GENERATED) $(PARSER_GEN)
 
 include .depend

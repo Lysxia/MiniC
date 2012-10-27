@@ -63,4 +63,3 @@ and sdesc =
 
 type file = stmt list
 
-exception Parse_error of location * string

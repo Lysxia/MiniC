@@ -32,6 +32,7 @@
 %left STAR DIV MOD
 %right NOT INCR DECR ADDRESS /*UStar UPlus UMinus*/
 %left ARROW DOT
+%left LPAR LBKT
 
 %start prog
 
@@ -39,15 +40,13 @@
 
 %%
 prog:
-  stmt_list_rev EOF
-  { List.rev $1 }
+  stmt* EOF
+  { List.flatten $1 }
 
-stmt_list_rev:
-  | /*EMPTY*/			{ [] }
-  | stmt_list_rev vstmt_list	{ (List.map (fun v -> V v) $2)@$1 }
-  | sl=stmt_list_rev s=tstmt
-  | sl=stmt_list_rev s=fstmt 	{
-      (Stmt { desc=s ; loc=loc $startpos(s) $endpos(s) })::sl }
+stmt:
+  | vstmt_list	{ List.map (fun v -> V v) $1 }
+  | s=tstmt | s=fstmt
+    { [Stmt { desc=s ; loc=loc $startpos(s) $endpos(s) }] }
 
 vstmt_list:
   | ty separated_nonempty_list(COMMA,var) SEMICOLON
@@ -61,8 +60,8 @@ tstmt:
 
 fstmt:
   t=ty count=star_count f=IDENT LPAR args=separated_list(COMMA,arg) RPAR
-    LBRC vslist=vstmt_list ilist=instr* RBRC
-    { Fct (mk_pointer t count,f,args,vslist,ilist) }
+    LBRC vslist=vstmt_list* ilist=instr* RBRC
+    { Fct (mk_pointer t count,f,args,List.flatten vslist,ilist) }
 
 var:
   star_count IDENT 	{ {desc=$1,$2 ; loc=loc $startpos $endpos} }

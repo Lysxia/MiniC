@@ -5,7 +5,7 @@
   open Lexing
   open Parser
 
-  exception Lexing_error of string
+  exception Error of string
 
   let kwd_tbl =
     ["char", 	CHAR;
@@ -26,12 +26,12 @@
     fun s ->
       try List.assoc s kwd_tbl with _ -> IDENT s
 
-  let newline lexbuf =
+  (*let newline lexbuf =
     let pos = lexbuf.lex_curr_p in
     lexbuf.lex_curr_p <-
       { pos with
           pos_lnum = pos.pos_lnum + 1;
-          pos_bol = pos.pos_cnum }
+          pos_bol = pos.pos_cnum }*)
   
 }
 
@@ -50,7 +50,7 @@ let car = (['\032'-'\127']#['\\' '\'' '"'])
           | ("\\x" hexa hexa)
 
 rule token = parse
-  | '\n'	{ newline lexbuf; token lexbuf }
+  | '\n'	{ new_line lexbuf; token lexbuf }
   | space+	{ token lexbuf }
   | ident as id	{ id_or_kwd id }
   | '*' 	{ STAR }
@@ -60,7 +60,7 @@ rule token = parse
   | ']' 	{ RBKT }
   | '{' 	{ LBRC }
   | '}' 	{ RBRC }
-  | ';' 	{ SEMICOLON }
+  | ';' 	{ SEMICOLON}
   | ',' 	{ COMMA }
   | '.' 	{ DOT }
   | "->"	{ ARROW }
@@ -76,7 +76,7 @@ rule token = parse
   | '<' 	{ LT }
   | "<="	{ LEQ }
   | '>' 	{ GT }
-  | "<="	{ GEQ }
+  | ">="	{ GEQ }
   | '/' 	{ DIV }
   | '%' 	{ MOD }
   | "&&"	{ AND }
@@ -90,10 +90,10 @@ rule token = parse
   | "//" [^ '\n'] 	{ token lexbuf }
   | "//" [^ '\n'] eof	{ EOF }
   | _ as c		{
-    raise (Lexing_error ("Illegal character: "^String.make 1 c)) }
+    raise (Error ("Illegal character: "^String.make 1 c)) }
 
 and comment = parse
-  | '\n'	{ newline lexbuf; comment lexbuf }
+  | '\n'	{ new_line lexbuf; comment lexbuf }
   | "*/"	{ token lexbuf }
   | _   	{ comment lexbuf }
-  | eof 	{ raise (Lexing_error "Unterminated comment") }
+  | eof 	{ raise (Error "Unterminated comment") }
