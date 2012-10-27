@@ -3,7 +3,7 @@
 
 %{
   open Ast
-  
+
   let loc startpos endpos =
     { start_p=startpos ; end_p=endpos }
 
@@ -32,7 +32,7 @@
 %left STAR DIV MOD
 %right NOT INCR DECR ADDRESS /*UStar UPlus UMinus*/
 %left ARROW DOT
-%left LPAR LBKT
+%left LBKT
 
 %start prog
 
@@ -53,10 +53,10 @@ vstmt_list:
       { List.map (vstmt_of_var_list $1) $2 }
 
 tstmt:
-  | STRUCT IDENT LBRC vstmt_list RBRC SEMICOLON
-    { Typ (Struct $2, $4) }
-  | UNION IDENT LBRC vstmt_list RBRC SEMICOLON
-    { Typ (Union $2, $4) }
+  | STRUCT IDENT LBRC vstmt_list* RBRC SEMICOLON
+    { Typ (Struct $2, List.flatten $4) }
+  | UNION IDENT LBRC vstmt_list* RBRC SEMICOLON
+    { Typ (Union $2, List.flatten $4) }
 
 fstmt:
   t=ty count=star_count f=IDENT LPAR args=separated_list(COMMA,arg) RPAR
@@ -64,7 +64,7 @@ fstmt:
     { Fct (mk_pointer t count,f,args,List.flatten vslist,ilist) }
 
 var:
-  star_count IDENT 	{ {desc=$1,$2 ; loc=loc $startpos $endpos} }
+  | star_count IDENT 	{ {desc=$1,$2 ; loc=loc $startpos $endpos} }
 
 star_count:
   | /*EMPTY*/ 		{ 0 }
@@ -142,6 +142,7 @@ idesc:
       test=expr? SEMICOLON
       inc=separated_list(COMMA,expr) RPAR i=instr
 	{ For (init,test,inc,i) }
-  | LBRC vstmt_list instr* RBRC 		{ Bloc ($2,$3) }
+  | LBRC vstmt_list* instr* RBRC 		{ Bloc (List.flatten $2,$3) }
   | RETURN expr? SEMICOLON		{ Return $2 }
 
+  

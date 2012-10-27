@@ -12,3 +12,7 @@ Questions :
 - 32 bits signed integers are not fully supported in lexer/parser.
   OCaml integers are 31 bits wide on 32 bit architectures,
   on 64b there is no problem however.
+
+10/28
+- Parsing errors probably should be taken care of inside parser.mly
+    ...(*an error occurs*) print_err_loc location; raise Error;
