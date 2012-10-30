@@ -3,7 +3,7 @@
 
 %{
   open Ast
-  
+
   let loc startpos endpos =
     { start_p=startpos ; end_p=endpos }
 
@@ -11,33 +11,8 @@
     if n = 0 then t else Point (n,t) 
 
   let vstmt_of_var_list t {desc=n,x ;loc=loc} =
-    {desc=mk_pointer t n,x ; loc=loc}
+    { desc=mk_pointer t n,x ; loc=loc }
 
-  let while_of_for e1 e2 e3 i loc =
-    let bool_optexpr = function
-      | None -> { desc=Cint 1 ; loc=loc }
-      | Some e -> e
-    in
-    Bloc ([],
-      List.fold_right
-        ( fun e -> fun l -> Expr e::l )
-        e1
-        [
-          Instr
-          {
-            desc=While
-            (
-              bool_optexpr e2,
-              Instr 
-              { desc=Bloc (
-                  [], [i]@
-                  (List.map (fun e -> Expr e) e3)) ;
-                loc=loc }
-            ) ;
-            loc=loc
-          }
-        ]
-               ) 
 %}
 
 %token <int> CST
@@ -57,6 +32,7 @@
 %left STAR DIV MOD
 %right NOT INCR DECR ADDRESS /*UStar UPlus UMinus*/
 %left ARROW DOT
+%left LBKT
 
 %start prog
 
@@ -64,33 +40,31 @@
 
 %%
 prog:
-  stmt_list_rev EOF
-  { List.rev $1 }
+  stmt* EOF
+  { List.flatten $1 }
 
-stmt_list_rev:
-  | /*EMPTY*/			{ [] }
-  | stmt_list_rev vstmt_list	{ (List.map (fun v -> V v) $2)@$1 }
-  | sl=stmt_list_rev s=tstmt
-  | sl=stmt_list_rev s=fstmt 	{
-      (Stmt { desc=s ; loc=loc $startpos(s) $endpos(s) })::sl }
+stmt:
+  | vstmt_list	{ List.map (fun v -> V v) $1 }
+  | s=tstmt | s=fstmt
+    { [Stmt { desc=s ; loc=loc $startpos(s) $endpos(s) }] }
 
 vstmt_list:
   | ty separated_nonempty_list(COMMA,var) SEMICOLON
       { List.map (vstmt_of_var_list $1) $2 }
 
 tstmt:
-  | STRUCT IDENT LBRC vstmt_list RBRC SEMICOLON
-    { Typ (Struct $2, $4) }
-  | UNION IDENT LBRC vstmt_list RBRC SEMICOLON
-    { Typ (Union $2, $4) }
+  | STRUCT IDENT LBRC vstmt_list* RBRC SEMICOLON
+    { Typ (Struct $2, List.flatten $4) }
+  | UNION IDENT LBRC vstmt_list* RBRC SEMICOLON
+    { Typ (Union $2, List.flatten $4) }
 
 fstmt:
   t=ty count=star_count f=IDENT LPAR args=separated_list(COMMA,arg) RPAR
-    LBRC vslist=vstmt_list ilist=instr* RBRC
-    { Fct (mk_pointer t count,f,args,vslist,ilist) }
+    LBRC vslist=vstmt_list* ilist=instr* RBRC
+    { Fct (mk_pointer t count,f,args,List.flatten vslist,ilist) }
 
 var:
-  star_count IDENT 	{ {desc=$1,$2 ; loc=loc $startpos $endpos} }
+  | star_count IDENT 	{ {desc=$1,$2 ; loc=loc $startpos $endpos} }
 
 star_count:
   | /*EMPTY*/ 		{ 0 }
@@ -167,7 +141,8 @@ idesc:
   | FOR LPAR init=separated_list(COMMA,expr) SEMICOLON
       test=expr? SEMICOLON
       inc=separated_list(COMMA,expr) RPAR i=instr
-	{ while_of_for init test inc i (loc $startpos $endpos) }
-  | LBRC vstmt_list instr* RBRC 		{ Bloc ($2,$3) }
+	{ For (init,test,inc,i) }
+  | LBRC vstmt_list* instr* RBRC 		{ Bloc (List.flatten $2,$3) }
   | RETURN expr? SEMICOLON		{ Return $2 }
 
+  

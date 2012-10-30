@@ -48,30 +48,31 @@ let rec print_i = function
 and print_idesc = function
   | Nop -> ();
   | If (e,i1,i2) -> print_string "if (";
-    print_expr e;
-    print_string ")\n";
-    incr d;
-    print_i i1;
-    decr d;
-    print_string "\n"; margin ();
-    print_string "else\n";
-    incr d;
-    print_i i2;
-    decr d;
+      print_expr e;
+      print_string ")\n";
+      incr d;
+      print_i i1;
+      decr d;
+      print_string "\n"; margin ();
+      print_string "else\n";
+      incr d;
+      print_i i2;
+      decr d;
   | While (e,i) -> print_string "while (";
-    print_expr e;
-    print_string ")\n";
-    incr d;
-    print_i i;
-    decr d;
+      print_expr e;
+      print_string ")\n";
+      incr d;
+      print_i i;
+      decr d;
+  | For (e1,e2,e3,i) -> print_string "for (...)";
   | Bloc (v,i) ->
-    print_string "\b\b\b\b{\n";
-    List.iter (fun v -> margin(); print_vs v; print_newline()) v;
-    List.iter print_i i;
-    print_string "\b\b\b\b}\n";
+      print_string "\b\b\b\b{\n";
+      List.iter (fun v -> margin(); print_vs v; print_newline()) v;
+      List.iter print_i i;
+      print_string "\b\b\b\b}\n";
   | Return e ->
-    print_string "Return ";
-    (match e with None -> ()
+      print_string "Return ";
+      (match e with None -> ()
                | Some e -> print_expr e);
     print_newline ()
 
@@ -80,21 +81,40 @@ let rec print_stmt = function
   | Stmt d -> print_sdesc d.desc; print_newline ();
 
 and print_sdesc = function
-  | Typ (t,_) | Typ (t,_) -> print_string "Constructor"; print_type t
+  | Typ (t,_) (*| Typ (t,_)*) -> print_string "Constructor"; print_type t
   | Fct (_,f,arg,v,i) -> print_string (f^"(");
-    List.iter (fun v -> print_vs v; print_string ",") arg;
-    print_string (if arg=[] then ")\n" else "\b)\n");
-    incr d;
-    List.iter (fun v -> margin (); print_vs v; print_newline()) v;
-    List.iter print_i i
+      List.iter (fun v -> print_vs v; print_string ",") arg;
+      print_string (if arg=[] then ")\n" else "\b)\n");
+      incr d;
+      List.iter (fun v -> margin (); print_vs v; print_newline()) v;
+      List.iter print_i i
 
 let print_ast =
   List.iter print_stmt
 
+let err_loc file buf =
+  let st = Lexing.lexeme_start_p buf in
+  let en = Lexing.lexeme_end_p buf in
+  Printf.fprintf stderr "File \"%s\", line %d, characters %d-%d:\n"
+    file
+    st.Lexing.pos_lnum
+    (st.Lexing.pos_cnum-st.Lexing.pos_bol)
+    (en.Lexing.pos_cnum-en.Lexing.pos_bol)
+
 let () =
-  for i = 1 to Array.length Sys.argv do
+  for i = 1 to Array.length Sys.argv - 1 do
     Printf.printf "File %s\n" Sys.argv.(i);
     let h = open_in Sys.argv.(i) in
-    print_ast (Parser.prog Lexer.token (Lexing.from_channel h));
+    let buf = Lexing.from_channel h in
+    begin
+      try
+        print_ast (Parser.prog Lexer.token buf);
+      with
+        | Lexer.Error s -> err_loc Sys.argv.(i) buf;
+            Printf.fprintf stderr "%s\n" s
+        | Parser.Error -> err_loc Sys.argv.(i) buf;
+            Printf.fprintf stderr "Syntax error\n" 
+    end;
+    close_in h;
     print_newline ()
   done

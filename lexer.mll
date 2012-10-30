@@ -5,6 +5,11 @@
   open Lexing
   open Parser
 
+<<<<<<< HEAD
+=======
+  exception Error of string
+
+>>>>>>> 2aaca0842d640306fe81932e8dce68ddb120998d
   let kwd_tbl =
     ["char", 	CHAR;
      "else", 	ELSE;
@@ -30,6 +35,7 @@
       { pos with
           pos_lnum = pos.pos_lnum + 1;
           pos_bol = pos.pos_cnum }*)
+<<<<<<< HEAD
 
   let lexerr lexbuf s =
     let start_p = lexeme_start_p lexbuf in
@@ -42,6 +48,9 @@
       s;
     exit 1
    
+=======
+  
+>>>>>>> 2aaca0842d640306fe81932e8dce68ddb120998d
 }
 
 let space = [' ' '\t']
@@ -69,7 +78,7 @@ rule token = parse
   | ']' 	{ RBKT }
   | '{' 	{ LBRC }
   | '}' 	{ RBRC }
-  | ';' 	{ SEMICOLON }
+  | ';' 	{ SEMICOLON}
   | ',' 	{ COMMA }
   | '.' 	{ DOT }
   | "->"	{ ARROW }
@@ -85,7 +94,7 @@ rule token = parse
   | '<' 	{ LT }
   | "<="	{ LEQ }
   | '>' 	{ GT }
-  | "<="	{ GEQ }
+  | ">="	{ GEQ }
   | '/' 	{ DIV }
   | '%' 	{ MOD }
   | "&&"	{ AND }
@@ -100,10 +109,18 @@ rule token = parse
   | "//" [^ '\n'] 	{ token lexbuf }
   | "//" [^ '\n'] eof	{ EOF }
   | _ as c		{
+<<<<<<< HEAD
       lexerr lexbuf ("Illegal character: "^String.make 1 c) }
+=======
+    raise (Error ("Illegal character: "^String.make 1 c)) }
+>>>>>>> 2aaca0842d640306fe81932e8dce68ddb120998d
 
 and comment = parse
-  | '\n'	{ newline lexbuf; comment lexbuf }
+  | '\n'	{ new_line lexbuf; comment lexbuf }
   | "*/"	{ token lexbuf }
   | _   	{ comment lexbuf }
+<<<<<<< HEAD
   | eof 	{ lexerr lexbuf "Unterminated comment" }
+=======
+  | eof 	{ raise (Error "Unterminated comment") }
+>>>>>>> 2aaca0842d640306fe81932e8dce68ddb120998d
