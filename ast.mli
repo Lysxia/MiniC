@@ -9,10 +9,10 @@ type 'a loc = {
   desc:'a ;
   loc:location }
 
-type t = Void | Int | Char
-  | Struct of string | Union of string | Point of int*t
-
 type ident = string
+
+type t = Void | Int | Char
+  | Struct of ident | Union of ident | Point of int*t
 
 
 type binop = Eq | Neq | Lt | Leq | Gt | Geq
@@ -26,10 +26,10 @@ type expr = edesc loc
 and edesc =
   | Cint of int
   | Cstring of string
-  | Ident of string
-  | Dot of expr*string
+  | Ident of ident
+  | Dot of expr*ident
   | Assign of expr*expr
-  | Call of string*(expr list)
+  | Call of ident*(expr list)
   | Unop of unop*expr
   | Binop of binop*expr*expr
   | Sizeof of t
