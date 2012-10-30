@@ -152,10 +152,7 @@ idesc:
   | FOR LPAR init=separated_list(COMMA,expr) SEMICOLON
       test=expr? SEMICOLON
       inc=separated_list(COMMA,expr) RPAR i=instr
-	{ For (init,
-                 (match test with
-                   | None -> Cint 1 ;
-                   | Some t -> t) ,inc,i) }
+	{ For (init,test,inc,i) }
   | LBRC vstmt_list* instr* RBRC 		{ Bloc (List.flatten $2,$3) }
   | RETURN expr? SEMICOLON		{ Return $2 }
 

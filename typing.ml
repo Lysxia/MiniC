@@ -35,7 +35,7 @@ and tidesc =
   | TNop
   | TIf of texpr*tinstr*tinstr
   | TWhile of texpr*tinstr
-  | TFor of (texpr list)*texpr*(texpr list)*tinstr
+  | TFor of (texpr list)*texpr*(texpr list)*tinstr
   | TBloc of (tvstmt list)*(tinstr list)
-  | TReturn of (texpr option)
+  | TReturn of (texpr option)
 
