@@ -4,6 +4,7 @@
 %{
   open Lexing
   open Ast
+  exception Error
 
   let loc startpos endpos =
     { start_p=startpos ; end_p=endpos }
@@ -22,7 +23,7 @@
       (start_p.pos_cnum-start_p.pos_bol)
       (end_p.pos_cnum-start_p.pos_bol)
       s;
-    failwith "Syntax error"
+    raise Error
 %}
 
 %token <int> CST
@@ -151,7 +152,10 @@ idesc:
   | FOR LPAR init=separated_list(COMMA,expr) SEMICOLON
       test=expr? SEMICOLON
       inc=separated_list(COMMA,expr) RPAR i=instr
-	{ For (init,test,inc,i) }
+	{ For (init,
+                 (match test with
+                   | None -> Cint 1 ;
+                   | Some t -> t) ,inc,i) }
   | LBRC vstmt_list* instr* RBRC 		{ Bloc (List.flatten $2,$3) }
   | RETURN expr? SEMICOLON		{ Return $2 }
 

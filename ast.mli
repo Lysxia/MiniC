@@ -48,7 +48,7 @@ and idesc =
   | Nop
   | If of expr*instr*instr
   | While of expr*instr
-  | For of (expr list)*(expr option)*(expr list)*instr
+  | For of (expr list)*expr*(expr list)*instr
   | Bloc of (vstmt list)*(instr list)
   | Return of (expr option)
 

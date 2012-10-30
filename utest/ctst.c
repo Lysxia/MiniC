@@ -2,7 +2,7 @@
  *  call gcc -c 'this_file.c'
  */
 
-#define TEST 5
+#define TEST 8
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -43,7 +43,7 @@ int d(){}
 
 #if TEST==5
 int e(){}
-int main()
+int m()
 {
     return e
 	();
@@ -51,3 +51,36 @@ int main()
 /* COMPILES
  * Whitespace is ignored */
 #endif
+
+#if TEST==6
+void f()
+{
+    int a;
+    float a;
+}
+/* FAILS */
+#endif
+
+#if TEST==7
+int a;
+void f ()
+{
+    char a;
+}
+/* COMPILES*/
+#endif
+
+#if TEST==8
+void f ()
+{
+    int a;
+    {
+	int a;
+    }
+}
+#endif
+
+int main()
+{
+    return 0;
+}

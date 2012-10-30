@@ -33,7 +33,7 @@
 
   let lexerr lexbuf s =
     let start_p = lexeme_start_p lexbuf in
-    Printf.printf
+    Printf.fprintf stderr
       "File \"%s\", line %d, characters %d-%d:\n%s\n%!"
       start_p.pos_fname
       start_p.pos_lnum
