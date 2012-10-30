@@ -16,3 +16,12 @@ Questions :
 10/28
 - Parsing errors probably should be taken care of inside parser.mly
     ...(*an error occurs*) print_err_loc location; raise Error;
+
+10/30
+- see utest/ctst.c for syntax details
+- contrary to what the subject states, gcc does not allow
+  bounding an ident to both an union and a struct
+- boundings inside a block overwrite declarations done outside. But
+  inside one statement sequence there can not be 2 variables with the
+  same name
+
