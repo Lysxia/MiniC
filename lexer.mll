@@ -5,8 +5,6 @@
   open Lexing
   open Parser
 
-  exception Lexing_error of string
-
   let kwd_tbl =
     ["char", 	CHAR;
      "else", 	ELSE;
@@ -26,13 +24,24 @@
     fun s ->
       try List.assoc s kwd_tbl with _ -> IDENT s
 
-  let newline lexbuf =
+  (*let newline lexbuf =
     let pos = lexbuf.lex_curr_p in
     lexbuf.lex_curr_p <-
       { pos with
           pos_lnum = pos.pos_lnum + 1;
-          pos_bol = pos.pos_cnum }
-  
+          pos_bol = pos.pos_cnum }*)
+
+  let lexerr lexbuf s =
+    let start_p = lexeme_start_p lexbuf in
+    Printf.printf
+      "File \"%s\", line %d, characters %d-%d:\n%s\n%!"
+      start_p.pos_fname
+      start_p.pos_lnum
+      (start_p.pos_cnum-start_p.pos_bol)
+      ((lexeme_end lexbuf)-start_p.pos_bol)
+      s;
+    exit 1
+   
 }
 
 let space = [' ' '\t']
@@ -50,7 +59,7 @@ let car = (['\032'-'\127']#['\\' '\'' '"'])
           | ("\\x" hexa hexa)
 
 rule token = parse
-  | '\n'	{ newline lexbuf; token lexbuf }
+  | '\n'	{ new_line lexbuf; token lexbuf }
   | space+	{ token lexbuf }
   | ident as id	{ id_or_kwd id }
   | '*' 	{ STAR }
@@ -85,15 +94,16 @@ rule token = parse
   (* signed 32 bits integer in C vs signed 31 bit integer in OCaml...  *)
   | "0" octal+ as n 	{ CST (int_of_string ("0o"^n)) }
   | integer as n 	{ CST (int_of_string n) }
+  | (digit|letter|'_')+	{ lexerr lexbuf "Not a number" }
   | "\"" car* as s "\"" { STR s }
   | "/*"	{ comment lexbuf }
   | "//" [^ '\n'] 	{ token lexbuf }
   | "//" [^ '\n'] eof	{ EOF }
   | _ as c		{
-    raise (Lexing_error ("Illegal character: "^String.make 1 c)) }
+      lexerr lexbuf ("Illegal character: "^String.make 1 c) }
 
 and comment = parse
   | '\n'	{ newline lexbuf; comment lexbuf }
   | "*/"	{ token lexbuf }
   | _   	{ comment lexbuf }
-  | eof 	{ raise (Lexing_error "Unterminated comment") }
+  | eof 	{ lexerr lexbuf "Unterminated comment" }
