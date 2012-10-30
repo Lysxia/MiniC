@@ -110,8 +110,6 @@ let () =
       try
         print_ast (Parser.prog Lexer.token buf);
       with
-        | Lexer.Error s -> err_loc Sys.argv.(i) buf;
-            Printf.fprintf stderr "%s\n" s
         | Parser.Error -> err_loc Sys.argv.(i) buf;
             Printf.fprintf stderr "Syntax error\n" 
     end;

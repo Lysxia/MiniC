@@ -40,7 +40,7 @@
       (start_p.pos_cnum-start_p.pos_bol)
       ((lexeme_end lexbuf)-start_p.pos_bol)
       s;
-    exit 1
+    failwith "Lexing error"
 }
 
 let space = [' ' '\t']

@@ -2,6 +2,7 @@
 /* Li-yao Xia */
 
 %{
+  open Lexing
   open Ast
 
   let loc startpos endpos =
@@ -13,6 +14,15 @@
   let vstmt_of_var_list t {desc=n,x ;loc=loc} =
     { desc=mk_pointer t n,x ; loc=loc }
 
+  let parse_err start_p end_p s =
+    Printf.printf
+      "File \"%s\", line %d, characters %d-%d:\n%s\n%!"
+      start_p.pos_fname
+      start_p.pos_lnum
+      (start_p.pos_cnum-start_p.pos_bol)
+      (end_p.pos_cnum-start_p.pos_bol)
+      s;
+    failwith "Syntax error"
 %}
 
 %token <int> CST
