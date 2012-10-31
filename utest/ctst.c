@@ -2,7 +2,7 @@
  *  call gcc -c 'this_file.c'
  */
 
-#define TEST 8
+#define TEST 14
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,8 +22,8 @@ void a(){}
 #endif
 
 #if TEST==2
-union b {};
-struct b {};
+union b { int a;};
+struct b { int a;};
 /* FAILS
  * union and struct share a namespace */
 #endif
@@ -80,7 +80,51 @@ void f ()
 }
 #endif
 
+#if TEST==9
+char a=0141;
+#endif
+
+#if TEST==10
+char a=97,b=98;
+int c()
+{
+    return a>b;
+}
+#endif
+
+#if TEST==11
+struct a {};
+int a() {}
+#endif
+
+#if TEST==12
+struct a {};
+int b()
+{
+    struct a a;
+    int** b;
+    a=b;
+}
+#endif
+
+#if TEST==13
+int b()
+{
+    0=0;
+}
+#endif
+
+#if TEST==14
+int a;
+int b() {
+    sizeof(void);
+}
+#endif
+
 int main()
 {
+    #if TEST==14
+      printf("%d %d\n",sizeof(void),sizeof(int));
+    #endif
     return 0;
 }
