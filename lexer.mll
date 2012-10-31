@@ -30,17 +30,6 @@
       { pos with
           pos_lnum = pos.pos_lnum + 1;
           pos_bol = pos.pos_cnum }*)
-
-  let lexerr lexbuf s =
-    let start_p = lexeme_start_p lexbuf in
-    Printf.fprintf stderr
-      "File \"%s\", line %d, characters %d-%d:\n%s\n%!"
-      start_p.pos_fname
-      start_p.pos_lnum
-      (start_p.pos_cnum-start_p.pos_bol)
-      ((lexeme_end lexbuf)-start_p.pos_bol)
-      s;
-    failwith "Lexing error"
 }
 
 let space = [' ' '\t']
@@ -93,16 +82,22 @@ rule token = parse
   (* signed 32 bits integer in C vs signed 31 bit integer in OCaml...  *)
   | "0" octal+ as n 	{ CST (int_of_string ("0o"^n)) }
   | integer as n 	{ CST (int_of_string n) }
-  | (digit|letter|'_')+	{ lexerr lexbuf "Not a number" }
+  | (digit|letter|'_')+	{
+      raise (Error.E (lexeme_start_p lexbuf,
+        lexeme_end_p lexbuf,"Not a number")) }
   | "\"" car* as s "\"" { STR s }
   | "/*"	{ comment lexbuf }
   | "//" [^ '\n'] 	{ token lexbuf }
   | "//" [^ '\n'] eof	{ EOF }
   | _ as c		{
-      lexerr lexbuf ("Illegal character: "^String.make 1 c) }
+      raise (Error.E (lexeme_start_p lexbuf,
+        lexeme_end_p lexbuf,
+        "Illegal character: "^String.make 1 c)) }
 
 and comment = parse
   | '\n'	{ new_line lexbuf; comment lexbuf }
   | "*/"	{ token lexbuf }
   | _   	{ comment lexbuf }
-  | eof 	{ lexerr lexbuf "Unterminated comment" }
+  | eof 	{
+      raise (Error.E (lexeme_start_p lexbuf,
+        lexeme_end_p lexbuf,"Unterminated comment")) }

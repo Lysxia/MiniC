@@ -4,7 +4,6 @@
 %{
   open Lexing
   open Ast
-  exception Error
 
   let loc startpos endpos =
     { start_p=startpos ; end_p=endpos }
@@ -15,15 +14,6 @@
   let vstmt_of_var_list t {desc=n,x ;loc=loc} =
     { desc=mk_pointer t n,x ; loc=loc }
 
-  let parse_err start_p end_p s =
-    Printf.printf
-      "File \"%s\", line %d, characters %d-%d:\n%s\n%!"
-      start_p.pos_fname
-      start_p.pos_lnum
-      (start_p.pos_cnum-start_p.pos_bol)
-      (end_p.pos_cnum-start_p.pos_bol)
-      s;
-    raise Error
 %}
 
 %token <int> CST
@@ -42,8 +32,7 @@
 %left PLUS MINUS
 %left STAR DIV MOD
 %right NOT INCR DECR ADDRESS /*UStar UPlus UMinus*/
-%left ARROW DOT
-%left LBKT
+%left ARROW DOT LBKT
 
 %start prog
 
@@ -70,7 +59,8 @@ tstmt:
     { Typ (Union $2, List.flatten $4) }
 
 fstmt:
-  t=ty count=star_count f=IDENT LPAR args=separated_list(COMMA,arg) RPAR
+  t=ty count=star_count f=IDENT
+    LPAR args=separated_list(COMMA,arg) RPAR
     LBRC vslist=vstmt_list* ilist=instr* RBRC
     { Fct (mk_pointer t count,f,args,List.flatten vslist,ilist) }
 
@@ -101,10 +91,14 @@ edesc:
   | STR 			{ Cstring $1 }
   | IDENT			{ Ident $1 }
   | expr DOT IDENT		{ Dot ($1,$3) }
-  | expr ARROW IDENT
-      { Dot ( { desc=Unop (Star,$1) ; loc=loc $startpos($1) $endpos($1) },$3) }
-  | expr LBKT expr RBKT
-      { Unop (Star, { desc=Binop (Plus,$1,$3) ; loc=loc $startpos $endpos }) }
+  | expr ARROW IDENT            {
+      Dot (
+      { desc=Unop (Star,$1);
+        loc=loc $startpos($1) $endpos($1) },$3) }
+  | expr LBKT expr RBKT		{
+      Unop (Star,
+        { desc=Binop (Plus,$1,$3);
+          loc=loc $startpos $endpos } ) }
   | expr ASSIGN expr		{ Assign ($1,$3) }
   | f=IDENT LPAR args=separated_list(COMMA,expr) RPAR
 				{ Call (f,args) }
@@ -145,15 +139,15 @@ instr:
 
 idesc:
   | SEMICOLON		 		{ Nop }
-  | IF LPAR expr RPAR instr
-      { If ($3,$5,Instr {desc=Nop;loc=loc $endpos $endpos}) }
+  | IF LPAR expr RPAR instr		{
+      If ($3,$5,Instr {desc=Nop;loc=loc $endpos $endpos}) }
   | IF LPAR expr RPAR instr ELSE instr 	{ If ($3,$5,$7) }
   | WHILE LPAR expr RPAR instr		{ While ($3,$5) }
   | FOR LPAR init=separated_list(COMMA,expr) SEMICOLON
       test=expr? SEMICOLON
       inc=separated_list(COMMA,expr) RPAR i=instr
 	{ For (init,test,inc,i) }
-  | LBRC vstmt_list* instr* RBRC 		{ Bloc (List.flatten $2,$3) }
+  | LBRC vstmt_list* instr* RBRC 	{ Bloc (List.flatten $2,$3) }
   | RETURN expr? SEMICOLON		{ Return $2 }
 
   
