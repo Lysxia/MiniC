@@ -31,7 +31,7 @@
 %left LT LEQ GT GEQ
 %left PLUS MINUS
 %left STAR DIV MOD
-%right NOT INCR DECR ADDRESS /*UStar UPlus UMinus*/
+%right NOT INCR DECR ADDRESS /*UStar UAdd USub*/
 %left ARROW DOT LBKT
 
 %start prog
@@ -97,7 +97,7 @@ edesc:
         loc=loc $startpos($1) $endpos($1) },$3) }
   | expr LBKT expr RBKT		{
       Unop (Star,
-        { desc=Binop (Plus,$1,$3);
+        { desc=Binop (Add,$1,$3);
           loc=loc $startpos $endpos } ) }
   | expr ASSIGN expr		{ Assign ($1,$3) }
   | f=IDENT LPAR args=separated_list(COMMA,expr) RPAR
@@ -125,8 +125,8 @@ edesc:
   | LEQ 	{ Leq }
   | GT  	{ Gt }
   | GEQ 	{ Geq }
-  | PLUS 	{ Plus }
-  | MINUS 	{ Minus }
+  | PLUS 	{ Add }
+  | MINUS 	{ Sub }
   | STAR 	{ Mul }
   | DIV 	{ Div }
   | MOD 	{ Mod }

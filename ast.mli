@@ -16,7 +16,7 @@ type t = Void | Int | Char
 
 
 type binop = Eq | Neq | Lt | Leq | Gt | Geq
-  | Plus | Minus | Mul | Div | Mod | And | Or
+  | Add | Sub | Mul | Div | Mod | And | Or
 
 type unop = Incrp | Decrp | Incrs | Decrs (* Plus-plus/Minus-minus pre/suffix *)
   | Address | Not | Uminus | Uplus | Star

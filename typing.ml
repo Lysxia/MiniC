@@ -87,7 +87,7 @@ let addable = function
   | I | C | Null -> true
   | _ -> false
 
-let congruent t1 t2 = match t1,t2 with
+let compatible t1 t2 = match t1,t2 with
   | _,_ when t1=t2 -> true
   | _,_ when addable t1 && addable t2 -> true
   | P (1,V), P (_,_) | P (_,_), P (1,V)
@@ -95,7 +95,7 @@ let congruent t1 t2 = match t1,t2 with
   | _,_ -> false
 
 let num t =
-  congruent t I || congruent t (P (73,I))
+  compatible t I || compatible t (P (73,I))
 
 (**)
 
@@ -142,7 +142,7 @@ let typedot loc e i =
 let typeassign loc e1 e2 =
   if lvalue e1.tdesc
     then begin
-      if congruent e1.t e2.t
+      if compatible e1.t e2.t
         then mkt (TAssign (e1,e2)) e1.t
         else error loc (
           "Incompatible types when assigning to type \'"^
@@ -161,9 +161,36 @@ let typeunop loc o e =
   (**)
   assert false
 
-let typebinop loc o e1 e2 =
-  (**)
-  assert false
+let typebinop loc =
+  let arith_rule o (* (+,-,*,/,%,||,&&) *) e1 e2 =
+    if compatible e1.t e2.t && compatible e1.t I
+      then mkt (TBinop (o,e1,e2)) I
+      else error loc "operands are not numerically compatible"
+  in
+  let add_sub_rule o (* (+,-) *) e1 e2 =
+    try arith_rule o e1 e2 with
+      Error.E _ ->
+        if compatible e1.t (P (1,V)) && compatible e2.t I
+          then mkt (TBinop (o,e1,e2)) (P (1,V))
+          else error loc "operands are not numerically compatible"
+  in
+  let add_rule o (*'+'*) e1 e2 =
+    try add_sub_rule o e1 e2 with
+      Error.E _ -> add_sub_rule o e2 e1
+  in
+  let sub_rule o (*'-'*) e1 e2 =
+    try add_sub_rule o e1 e2 with
+      Error.E _ -> assert false(**)
+  in
+  fun o e1 e2 -> match o with
+  | Eq | Neq | Lt | Leq | Gt | Geq ->
+      if compatible e1.t e2.t && num e1.t
+        then mkt (TBinop (o,e1,e2)) I
+        else error loc "operands are not numerically compatible"
+  | Mul | Div | Mod | And | Or ->
+      arith_rule o e1 e2
+  | Add -> add_rule o e1 e2
+  | Sub -> sub_rule o e1 e2
 
 let rec typeexpr env { desc=edesc ; loc=loc } =
   match edesc with
