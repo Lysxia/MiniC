@@ -5,10 +5,8 @@ module Imap : Map.S with type key=int
 
 type tident = int
 
-type zero = Zero | Ii | Null
-
 type tt = V | I | C | S of tident | U of tident
-  | P of int*tt | Z of zero ref
+  | P of int*tt | Null
 
 type 'a typed = { tdesc:'a ; t:tt }
 

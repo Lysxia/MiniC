@@ -15,13 +15,10 @@ module Smap = Map.Make(String)
  
 type tident = int
 
-type zero = Zero | Ii | Null
-
 (* P (n,t) when n>0 which is the case for any AST built
- * with parser. type Zero is a wildcard for the 0 value,
- * which may be either Typenull or Int *)
+ * with parser *)
 type tt = V | I | C | S of tident | U of tident
-  | P of int*tt | Z of (zero ref)
+  | P of int*tt | Null
 
 type 'a typed = { tdesc:'a ; t:tt }
 
@@ -74,14 +71,12 @@ let tbl_fct_strid = Hashtbl.create 17
 
 let rec strtype = function
   | V -> "void"
-  | Z r when !r = Ii -> "int"
   | I -> "int"
   | C -> "char"
   | S s -> "struct "^(Hashtbl.find tbl_string_of_int s)
   | U s -> "union "^(Hashtbl.find tbl_string_of_int s)
   | P (n,t) -> (strtype t)^String.make n '*'
-  | Z r when !r=Null -> "typenull"
-  | Z _ -> "_zero"
+  | Null -> "typenull"
 
 let error loc s =
   raise (Error.E (loc.start_p,loc.end_p,s))
@@ -89,14 +84,14 @@ let error loc s =
 (* Type relationships *)
 
 let addable = function
-  | I | C | Z _ -> true
+  | I | C | Null -> true
   | _ -> false
 
 let congruent t1 t2 = match t1,t2 with
   | _,_ when t1=t2 -> true
   | _,_ when addable t1 && addable t2 -> true
-  | P (1,V), P (_,_) | P (_,_), P (1,V) -> true
-  | Z r, P (_,_) | P (_,_),Z r when !r=Null -> true
+  | P (1,V), P (_,_) | P (_,_), P (1,V)
+  | Null, P (_,_) | P (_,_),Null -> true
   | _,_ -> false
 
 let num t =
@@ -172,7 +167,7 @@ let typebinop loc o e1 e2 =
 
 let rec typeexpr env { desc=edesc ; loc=loc } =
   match edesc with
-    | Cint 0 -> mkt (TCi 0) (Z (ref Zero)) (**)
+    | Cint 0 -> mkt (TCi 0) Null
     | Cint i -> mkt (TCi i) I
     | Cstring s -> mkt (TCs s) (P (1,C))
     | Ident x -> Smap.find x env

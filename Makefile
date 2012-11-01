@@ -2,7 +2,7 @@
 # Li-yao Xia
 #
 
-CMO=lexer.cmo parser.cmo parser_test.cmo
+CMO=error.cmo lexer.cmo parser.cmo typing.cmo parser_test.cmo
 GENERATED = lexer.ml parser.ml parser.mli
 PARSER_GEN = parser.automaton parser.conflicts
 BIN=parser_test
