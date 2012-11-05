@@ -29,7 +29,7 @@ and edesc =
   | Ident of ident
   | Dot of expr*ident
   | Assign of expr*expr
-  | Call of ident*(expr list)
+  | Call of ident*expr list
   | Unop of unop*expr
   | Binop of binop*expr*expr
   | Sizeof of t
@@ -48,9 +48,9 @@ and idesc =
   | Nop
   | If of expr*instr*instr
   | While of expr*instr
-  | For of (expr list)*(expr option)*(expr list)*instr
-  | Bloc of (vstmt list)*(instr list)
-  | Return of (expr option)
+  | For of expr list*expr option*expr list*instr
+  | Bloc of vstmt list*instr list
+  | Return of expr option
 
 
 type stmt = 
@@ -58,8 +58,8 @@ type stmt =
   | V of vstmt
 
 and sdesc =
-  | Typ of t*(vstmt list)
-  | Fct of t*ident*(vstmt list)*(vstmt list)*(instr list)
+  | Typ of t*vstmt list
+  | Fct of t*ident*vstmt list*vstmt list*instr list
 
 type file = stmt list
 

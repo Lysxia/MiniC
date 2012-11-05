@@ -2,7 +2,7 @@
  *  call gcc -c 'this_file.c'
  */
 
-#define TEST 14
+#define TEST 16
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,62 +17,58 @@ int main(int argc, char** argv)
 #if TEST==1
 void a(){}
 void a(){}
-/* FAILS
+/* Rejected
  * do not bind the same function name twice */
 #endif
 
 #if TEST==2
 union b { int a;};
 struct b { int a;};
-/* FAILS
+/* Rejected
  * union and struct share a namespace */
 #endif
 
 #if TEST==3
 union c {};
 int c(){}
-/* COMPILES
+/* Accepted
  * struct/unions and functions can share a same name */
 #endif
 
 #if TEST==4
 int d;
 int d(){}
-/* FAILS */
+/* Rejected */
 #endif
 
 #if TEST==5
-int e(){}
-int m()
-{
+int e() {}
+int m() {
     return e
 	();
 }
-/* COMPILES
+/* Accepted
  * Whitespace is ignored */
 #endif
 
 #if TEST==6
-void f()
-{
+void f() {
     int a;
     float a;
 }
-/* FAILS */
+/* Rejected */
 #endif
 
 #if TEST==7
 int a;
-void f ()
-{
+void f () {
     char a;
 }
-/* COMPILES*/
+/* Accepted*/
 #endif
 
 #if TEST==8
-void f ()
-{
+void f () {
     int a;
     {
 	int a;
@@ -82,12 +78,12 @@ void f ()
 
 #if TEST==9
 char a=0141;
+/* Accepted */
 #endif
 
 #if TEST==10
 char a=97,b=98;
-int c()
-{
+int c() {
     return a>b;
 }
 #endif
@@ -99,8 +95,7 @@ int a() {}
 
 #if TEST==12
 struct a {};
-int b()
-{
+int b() {
     struct a a;
     int** b;
     a=b;
@@ -108,8 +103,7 @@ int b()
 #endif
 
 #if TEST==13
-int b()
-{
+int b() {
     0=0;
 }
 #endif
@@ -118,6 +112,22 @@ int b()
 int a;
 int b() {
     sizeof(void);
+}
+/* Accepted */
+#endif
+
+#if TEST==15
+int b() {
+    return *(0+0);
+}
+/* Rejected */
+#endif
+
+#if TEST==16
+struct a{int b;};
+int a(){
+    struct a b;
+    return b.a;
 }
 #endif
 
