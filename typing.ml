@@ -74,7 +74,7 @@ type tfile =
 
 type env = {
   f : (tt*tt list) Smap.t ; (* functions *)
-  su : tt Smap.t; (* structure/union types *)
+  su : tt Smap.t; (* defined structure/union types *)
   sm : (tt*tident) Smap.t Imap.t ; (* s/u members *)
   v : (tt*tident) Smap.t ; (* variables *)
   }
@@ -111,10 +111,10 @@ let addable = function
   | _ -> false
 
 let compatible t1 t2 = match t1,t2 with
-  | _,_ when t1=t2 -> true
   | _,_ when addable t1 && addable t2 -> true
   | P (1,V), P (_,_) | P (_,_), P (1,V)
   | Null, P (_,_) | P (_,_),Null -> true
+  | _,_ when t1=t2 -> true
   | _ -> false
 
 let num t =
@@ -170,7 +170,7 @@ let mkt d t = { tdesc=d ; t=t }
  *     # typenull === int
  *     # + = '+' or '-'
  * is well typed theoretically but dereferences a NULL pointer
- * Forbidding such cases is safer
+ * Forbidding such cases is safer,
  * I can be lazier that way because no unifying needs to be done
  * and gcc does so too
  * *)
@@ -196,9 +196,23 @@ let typeassign e1 e2 =
     else raise (E
       "lvalue required as left operand of assignment")
 
-let typecall f el =
-  (**)
-  assert false
+let typecall =
+  let rec matchtype i = function
+    | [],[] -> ()
+    | t::tt,e::et when compatible t e.t -> matchtype (i+1) tt et
+    | [],_ -> raise (E "This function is applied to too many arguments")
+    | _,[] -> raise (E "This function is applied to too few arguments")
+    | t::_,e::_ -> raise (E
+        ("Argument "^(string_of_int i)^" has type \'"^
+          (stringtype e.t)^
+          "\' but an expression was expected of type \'"^
+          (stringtype t)^"\'"))
+  in
+  fun env f el ->
+  try
+    let rett,argt = Smap.find f env.f in
+    matchtype argt el;
+    mkt (TCall (
 
 let typeunop o e =
   (**)
@@ -257,7 +271,7 @@ let rec typeexpr env { desc=edesc ; loc=loc } =
       | Call (f,elist) ->
           let el = List.map
             (typeexpr env) elist in
-          typecall f el
+          typecall env f el
       | Unop (o,e) -> let e = typeexpr env e in
           typeunop o e
       | Binop (o,e1,e2) ->
