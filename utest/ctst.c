@@ -2,7 +2,7 @@
  *  call gcc -c 'this_file.c'
  */
 
-#define TEST 16
+#define TEST 19
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -45,7 +45,7 @@ int d(){}
 int e() {}
 int m() {
     return e
-	();
+  ();
 }
 /* Accepted
  * Whitespace is ignored */
@@ -128,6 +128,35 @@ struct a{int b;};
 int a(){
     struct a b;
     return b.a;
+}
+/* Rejected */
+#endif
+
+#if TEST==17
+struct a{};
+int a(){
+    struct a b;
+    return !b;
+}
+#endif
+
+#if TEST==18
+int a(){
+    return &1;
+}
+#endif
+
+#if TEST==19
+int a(){
+    return ++1;
+}
+#endif
+
+#if TEST==20
+struct a{};
+int a(){
+    struct a a;
+    return ++a;
 }
 #endif
 

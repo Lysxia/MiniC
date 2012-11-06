@@ -73,7 +73,7 @@ type tfile =
  * this is for absolute efficiency only *)
 
 type env = {
-  f : (tt*tt list) Smap.t ; (* functions *)
+  f : (tt*tident*tt list) Smap.t ; (* functions *)
   su : tt Smap.t; (* defined structure/union types *)
   sm : (tt*tident) Smap.t Imap.t ; (* s/u members *)
   v : (tt*tident) Smap.t ; (* variables *)
@@ -105,6 +105,15 @@ let su_id = function
 (*****)
 
 (* Type relationships *)
+
+let mkpnt = function
+  | P (n,t) -> P (n+1,t)
+  | t -> P (1,t)
+
+let deref = function
+  | P (1,t) -> t
+  | P (n,t) when n>0 -> P (n-1,t)
+  | _ -> raise (E "is not a pointer")
 
 let addable = function
   | I | C | Null -> true
@@ -197,12 +206,12 @@ let typeassign e1 e2 =
       "lvalue required as left operand of assignment")
 
 let typecall =
-  let rec matchtype i = function
-    | [],[] -> ()
-    | t::tt,e::et when compatible t e.t -> matchtype (i+1) tt et
+  let rec matchtype i tl el = match tl,el with
+    | [],[] -> ()
+    | t::tt,e::et when compatible t e.t -> matchtype (i+1) tt et
     | [],_ -> raise (E "This function is applied to too many arguments")
     | _,[] -> raise (E "This function is applied to too few arguments")
-    | t::_,e::_ -> raise (E
+    | t::_,e::_ -> raise (E
         ("Argument "^(string_of_int i)^" has type \'"^
           (stringtype e.t)^
           "\' but an expression was expected of type \'"^
@@ -210,13 +219,28 @@ let typecall =
   in
   fun env f el ->
   try
-    let rett,argt = Smap.find f env.f in
-    matchtype argt el;
-    mkt (TCall (
+    let rett,id,argt = Smap.find f env.f in
+    matchtype 1 argt el;
+    mkt (TCall (id,el)) rett
+  with
+    Not_found -> raise (E ("\'"^f^"\' is not a function"))
 
-let typeunop o e =
-  (**)
-  assert false
+let typeunop o e = match o with
+  | Incrp | Incrs | Decrp | Decrs ->
+      let lv = lvalue e.tdesc and n = num e.t in
+      if lv && n
+        then mkt (TUnop (o,e)) e.t
+      else if not lv
+        then raise (E "lvalue required as incr/decrement operand")
+      else raise (E "wrong argument type as incr/decrement operand")
+  | Address -> if lvalue e.tdesc then mkt (TUnop (Address,e)) (mkpnt e.t)
+      else raise (E "lvalue required as unary '&' operand")
+  | Not -> if num e.t then mkt (TUnop (Not,e)) I
+      else raise (E "wrong type argument to unary '!'")
+  | Uminus | Uplus -> if compatible e.t I then mkt (TUnop (o,e)) I
+      else raise (E ("wrong type argument to unary \'"^
+        (if o=Uminus then "-" else "+")^"\'"))
+  | Star -> mkt (TUnop (o,e)) (deref e.t)
 
 (* Addition and substraction rules create a lot of cases to be checked *)
 let typebinop =
