@@ -3,8 +3,8 @@
 #
 
 CMO=error.cmo lexer.cmo parser.cmo typing.cmo parser_test.cmo
-GENERATED = lexer.ml parser.ml parser.mli
-PARSER_GEN = parser.automaton parser.conflicts
+GENERATED=lexer.ml parser.ml parser.mli
+PARSER_GEN=parser.automaton parser.conflicts
 BIN=parser_test
 
 $(BIN):$(CMO)
@@ -23,7 +23,7 @@ $(BIN):$(CMO)
 	ocamllex $<
 
 .mly.ml:
-	menhir -v $<
+	menhir -v --infer $<
 
 .depend depend:$(GENERATED)
 	rm -f .depend
@@ -31,5 +31,7 @@ $(BIN):$(CMO)
 
 clean:
 	rm -f *.cm[io] *.o *~ $(GENERATED) $(PARSER_GEN)
+
+parser.ml: ast.cmi
 
 include .depend

@@ -47,6 +47,6 @@ type tconstr = tt*tt array
 
 type tfct = tt*tvstmt list*tvstmt list*tinstr list
 
-type tfile = (tident,tconstr) Hashtbl.t*tfct list*tvstmt list
+type tfile = tconstr Imap.t*tfct list*tvstmt list
 
 val type_prog : Ast.file -> tfile

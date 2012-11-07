@@ -17,6 +17,7 @@ module Imap = Map.Make(
  
 module Smap = Map.Make(String)
 
+module Sset = Set.Make(String)
  
 type tident = int
 
@@ -65,7 +66,7 @@ type tconstr = tt*tt array
 type tfct = tt*tvstmt list*tvstmt list*tinstr list
 
 type tfile =
-  (int,tconstr) Hashtbl.t*tfct list*tvstmt list
+  tconstr Imap.t*tfct list*tvstmt list
 (*****)
 
 (* Identifiers are converted to numbers,
@@ -76,9 +77,10 @@ type env = {
   su : tt Smap.t; (* defined structure/union types *)
   sm : (tt*tident) Smap.t Imap.t ; (* s/u members *)
   v : (tt*tident) Smap.t ; (* variables *)
+  free : int
   }
 
-let empty = {f=Smap.empty;su=Smap.empty;sm=Imap.empty;v=Smap.empty}
+let empty = {f=Smap.empty;su=Smap.empty;sm=Imap.empty;v=Smap.empty;free=0}
 
 let globals = ref empty
 
@@ -138,7 +140,7 @@ let rec wft (* well formed type*) env = function
   | Void -> V
   | Int -> I
   | Char -> C
-  | Point (n,t) -> P (n,wft t)
+  | Point (n,t) -> P (n,wft env t)
   | Struct s ->
       begin
         try
@@ -313,37 +315,75 @@ let rec typeexpr env { desc=edesc ; loc=loc } =
 (* Variable declaration *)
 let typevdec env { desc=vt,vid ; loc=loc } =
   let vt = wft env vt in
-  
+  if vt = V
+    then
+      error loc ("variable or field \'"^vid^"\' declared void")
+    else { env with
+      v=Smap.add vid (vt,env.free) env.v;
+      free=env.free+1 }
+
+(* Checks name unicity
+ * (in a declaration sequence inside one block) *)
+let typevdeclist env vl =
+  let rec uni env tvl s = function
+  | [] -> env,tvl
+  | ({ desc=_,vid ; loc=loc } as h)::t ->
+      if Sset.mem vid s
+        then error loc
+          ("previous declaration of \'"^vid^"\' was here")
+        else ( let env = typevdec env h in
+          uni env ((Smap.find vid env.v)::tvl)
+          (Sset.add vid s) t)
+  in
+  uni env [] Sset.empty vl
+
+
 (*****)
 
 (* Instruction typing *)
-let rec typeinstr rt env = function
+let rec typeinstr t0 env = function
   | Expr e -> TExpr (typeexpr env e)
-  | Instr i -> typei rt env i
+  | Instr i -> typei t0 env i
 
-and typei rt env { desc=idesc ; loc=loc } =
+and typei t0 env { desc=idesc ; loc=loc } =
   try
     match idesc with
+      | Nop -> TNop
       | If (e,i1,i2) -> let e = typeexpr env e in
           if num e.t
-            then TIf (e,typeinstr rt env i1,typeinstr rt env i2)
-            else raise (E "used \'"^(stringtype e.t)^
-              "\' type value where scalar is required")
+            then TIf (e,typeinstr t0 env i1,typeinstr t0 env i2)
+            else raise (E ("used \'"^(stringtype e.t)^
+              "\' type value where scalar is required"))
       | While (e,i) -> let e = typeexpr env e in
           if num e.t
-            then TWhile (e,typeinstr rt env i)
-            else raise (E "used \'"^(stringtype e.t)^
-              "\' type value where scalar is required")
+            then TWhile (e,typeinstr t0 env i)
+            else raise (E ("used \'"^(stringtype e.t)^
+              "\' type value where scalar is required"))
       | For (el1,e,el2,i) -> let e = match e with
             | None -> mkt (TCi 1) I
             | Some e -> typeexpr env e in
           if num e.t
             then TFor (
               List.map (typeexpr env) el1, e,
-              List.map (typeexpr env) el2, typeinstr rt env i)
-            else raise (E "used \'"^(stringtype e.t)^
-              "\' type value where scalar is required")
-      | Bloc (vl,il) ->   
+              List.map (typeexpr env) el2, typeinstr t0 env i)
+            else raise (E ("used \'"^(stringtype e.t)^
+              "\' type value where scalar is required"))
+      | Bloc (vl,il) -> let env,tvl = typevdeclist env vl in
+          TBloc (tvl,List.map (typeinstr t0 env) il)
+      | Return None ->
+          if t0=V
+            then TReturn None
+            else raise (E
+              ("\'return\' with a value, "^
+              "in function returning void"))
+      | Return (Some e) -> let e = typeexpr env e in
+          if compatible e.t t0
+            then TReturn (Some e)
+            else raise (E
+              ("incompatible types when returning type \'"^
+               (stringtype e.t)^"\' but \'"^(stringtype t0)^
+               "\' was expected"))
+  with E s -> error loc s
 
 (*****)
 
@@ -353,4 +393,4 @@ let type_prog ast =
   assert false
 (*****)
 
-(*______\o/_______________/[___S_H_A_R_K___A_T_T_A_C_K___!___*)
+(*____\o/_______________/[_____S_H_A_R_K___A_T_T_A_C_K___!___*)
