@@ -2,7 +2,7 @@
  *  call gcc -c 'this_file.c'
  */
 
-#define TEST 19
+#define TEST 22
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -160,10 +160,21 @@ int a(){
 }
 #endif
 
+#if TEST==21
+struct a{};
+int a(){
+    struct a a;
+    if (a);
+}
+#endif
+
 int main()
 {
     #if TEST==14
       printf("%d %d\n",sizeof(void),sizeof(int));
+    #endif
+    #if TEST==22
+      struct a a;
     #endif
     return 0;
 }

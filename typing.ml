@@ -51,10 +51,9 @@ and tedesc =
 
 type tvstmt = tt*tident
 
-type tinstr = tidesc typed
-
-and tidesc =
+type tinstr =
   | TNop
+  | TExpr of texpr
   | TIf of texpr*tinstr*tinstr
   | TWhile of texpr*tinstr
   | TFor of texpr list*texpr*texpr list*tinstr
@@ -135,7 +134,7 @@ let num t =
 
 (* gcc does not allow struct and union
  * with the same identifier, so we don't either *)
-let rec wft (* well formed type*) = function
+let rec wft (* well formed type*) env = function
   | Void -> V
   | Int -> I
   | Char -> C
@@ -143,7 +142,7 @@ let rec wft (* well formed type*) = function
   | Struct s ->
       begin
         try
-          match Smap.find s !globals.su with
+          match Smap.find s env.su with
             | S i -> S i
             | _ -> raise Not_found
         with
@@ -152,7 +151,7 @@ let rec wft (* well formed type*) = function
       end
   | Union s ->
       try
-        match Smap.find s !globals.su with
+        match Smap.find s env.su with
           | U i -> U i
           | _ -> raise Not_found
       with
@@ -303,7 +302,7 @@ let rec typeexpr env { desc=edesc ; loc=loc } =
           let e2 = typeexpr env e2 in
           typebinop o e1 e2
       | Sizeof t -> (* gcc sizeof(void)=1 *)
-          let t = wft t in
+          let t = wft env t in
           if t = V
             then raise (E "type \'void\' has no size")
             else mkt (TSizeof t) I
@@ -311,7 +310,41 @@ let rec typeexpr env { desc=edesc ; loc=loc } =
     | E s -> error loc s
 (*****)
 
+(* Variable declaration *)
+let typevdec env { desc=vt,vid ; loc=loc } =
+  let vt = wft env vt in
+  
+(*****)
+
 (* Instruction typing *)
+let rec typeinstr rt env = function
+  | Expr e -> TExpr (typeexpr env e)
+  | Instr i -> typei rt env i
+
+and typei rt env { desc=idesc ; loc=loc } =
+  try
+    match idesc with
+      | If (e,i1,i2) -> let e = typeexpr env e in
+          if num e.t
+            then TIf (e,typeinstr rt env i1,typeinstr rt env i2)
+            else raise (E "used \'"^(stringtype e.t)^
+              "\' type value where scalar is required")
+      | While (e,i) -> let e = typeexpr env e in
+          if num e.t
+            then TWhile (e,typeinstr rt env i)
+            else raise (E "used \'"^(stringtype e.t)^
+              "\' type value where scalar is required")
+      | For (el1,e,el2,i) -> let e = match e with
+            | None -> mkt (TCi 1) I
+            | Some e -> typeexpr env e in
+          if num e.t
+            then TFor (
+              List.map (typeexpr env) el1, e,
+              List.map (typeexpr env) el2, typeinstr rt env i)
+            else raise (E "used \'"^(stringtype e.t)^
+              "\' type value where scalar is required")
+      | Bloc (vl,il) ->   
+
 (*****)
 
 (* Program typing *)

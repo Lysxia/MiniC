@@ -85,7 +85,8 @@ rule token = parse
   | (digit|letter|'_')+	{
       raise (Error.E (lexeme_start_p lexbuf,
         lexeme_end_p lexbuf,"Not a number")) }
-  | "\"" car* as s "\"" { STR s }
+  (* escape seq are not well supported *)
+  | "\"" (car* as s) "\"" { STR s }
   | "/*"	{ comment lexbuf }
   | "//" [^ '\n'] 	{ token lexbuf }
   | "//" [^ '\n'] eof	{ EOF }

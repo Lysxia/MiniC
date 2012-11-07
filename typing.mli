@@ -34,10 +34,9 @@ and tedesc =
 
 type tvstmt = tt*tident
 
-type tinstr = tidesc typed
-
-and tidesc =
+type tinstr =
   | TNop
+  | TExpr of texpr
   | TIf of texpr*tinstr*tinstr
   | TWhile of texpr*tinstr
   | TFor of texpr list*texpr*texpr list*tinstr
