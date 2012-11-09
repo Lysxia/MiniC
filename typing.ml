@@ -336,8 +336,6 @@ let typevdeclist env vl =
           (Sset.add vid s) t)
   in
   uni env [] Sset.empty vl
-
-
 (*****)
 
 (* Instruction typing *)
@@ -384,7 +382,6 @@ and typei t0 env { desc=idesc ; loc=loc } =
                (stringtype e.t)^"\' but \'"^(stringtype t0)^
                "\' was expected"))
   with E s -> error loc s
-
 (*****)
 
 (* Program typing *)
