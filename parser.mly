@@ -11,7 +11,7 @@
   let mk_pointer t n =
     if n = 0 then t else Point (n,t) 
 
-  let vstmt_of_var_list t {desc=n,x ;loc=loc} =
+  let vstmt_of_var_list t { desc=n,x ; loc=loc } =
     { desc=mk_pointer t n,x ; loc=loc }
 
 %}
@@ -149,5 +149,4 @@ idesc:
 	{ For (init,test,inc,i) }
   | LBRC vstmt_list* instr* RBRC 	{ Bloc (List.flatten $2,$3) }
   | RETURN expr? SEMICOLON		{ Return $2 }
-
-  
+ 
