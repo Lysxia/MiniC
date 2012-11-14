@@ -50,7 +50,7 @@ and tedesc =
   | TSizeof of tt
 
 
-type tvstmt = tt*tident
+type tvdec = tt*tident
 
 type tinstr =
   | TNop
@@ -58,15 +58,15 @@ type tinstr =
   | TIf of texpr*tinstr*tinstr
   | TWhile of texpr*tinstr
   | TFor of texpr list*texpr*texpr list*tinstr
-  | TBloc of tvstmt list*tinstr list
+  | TBloc of tvdec list*tinstr list
   | TReturn of texpr option
 
 type tconstr = tt*tt array
 
-type tfct = tt*tvstmt list*tvstmt list*tinstr list
+type tfct = tt*tident*tvdec list*tinstr (* a block *)
 
 type tfile =
-  tconstr Imap.t*tfct list*tvstmt list
+  tconstr list*tfct list*tvdec list
 (*****)
 
 (* Identifiers are converted to numbers,
@@ -77,10 +77,15 @@ type env = {
   su : tt Smap.t; (* defined structure/union types *)
   sm : (tt*tident) Smap.t Imap.t ; (* s/u members *)
   v : (tt*tident) Smap.t ; (* variables *)
-  free : int
+  free : int ;
   }
 
-let empty = {f=Smap.empty;su=Smap.empty;sm=Imap.empty;v=Smap.empty;free=0}
+let empty = {
+  f=Smap.empty;
+  su=Smap.empty;
+  sm=Imap.empty;
+  v=Smap.empty;
+  free=0;}
 
 let globals = ref empty
 
@@ -168,23 +173,6 @@ let rec lvalue = function
 let mkt d t = { tdesc=d ; t=t }
 
 (* Expression typing *)
-
-(* In typeunop : case Star,
- * this is a bit more restrictive than specifications on the paper
- * Example :
- * # *(0+0) : int
- *   # 0+0 : int*
- *     # 0 : typenull
- *     # 0 : typenull
- *     # typenull === int*
- *     # typenull === int
- *     # + = '+' or '-'
- * is well typed theoretically but dereferences a NULL pointer
- * Forbidding such cases is safer,
- * I can be lazier that way because no unifying needs to be done
- * and gcc does so too
- * *)
-
 let typedot env e i =
   try
     let t,i = Smap.find i (Imap.find (su_id e.t) env.sm) in
@@ -250,22 +238,20 @@ let typebinop =
       then mkt (TBinop (o,e1,e2)) I
       else raise (E "operands are not numerically compatible")
   in
-  let add_sub_rule o (* (+,-) *) e1 e2 =
-    try arith_rule o e1 e2 with
-      E _ ->
-        if compatible e1.t (P (1,V)) && compatible e2.t I
-          then mkt (TBinop (o,e1,e2)) (P (1,V))
-          else raise (E "operands are not numerically compatible")
+  let add_rule (* (+) *) e1 e2 =
+    match e1.t,e2.t with
+      | P (n,t),u | u,P (n,t) when compatible u I
+        -> mkt (TBinop (Add,e1,e2)) (P (n,t))
+      | _,_ -> try arith_rule Add e1 e2 
+        with E _ -> arith_rule Add e2 e1
   in
-  let add_rule o (*'+'*) e1 e2 =
-    try add_sub_rule o e1 e2 with
-      E _ -> add_sub_rule o e2 e1
-  in
-  let sub_rule o (*'-'*) e1 e2 =
-    try add_sub_rule o e1 e2 with
-      E _ ->
-        (**)
-        assert false
+  let sub_rule (* (-) *) e1 e2 =
+    match e1.t,e2.t with
+      | P (n,t),P (m,u) when m=n && t=u ->
+        mkt (TBinop (Sub,e1,e2)) I
+      | P (n,t),u when compatible u I ->
+        mkt (TBinop (Sub,e1,e2)) (P (n,t))
+      | _,_ -> arith_rule Sub e1 e2
   in
   fun o e1 e2 -> match o with
   | Eq | Neq | Lt | Leq | Gt | Geq ->
@@ -274,8 +260,8 @@ let typebinop =
         else raise (E "operands are not numerically compatible")
   | Mul | Div | Mod | And | Or ->
       arith_rule o e1 e2
-  | Add -> add_rule o e1 e2
-  | Sub -> sub_rule o e1 e2
+  | Add -> add_rule e1 e2
+  | Sub -> sub_rule e1 e2
 
 (* Main expression typing function *)
 let rec typeexpr env { desc=edesc ; loc=loc } =
@@ -305,7 +291,7 @@ let rec typeexpr env { desc=edesc ; loc=loc } =
           typebinop o e1 e2
       | Sizeof t -> (* gcc sizeof(void)=1 *)
           let t = wft env t in
-          if t = V
+          if compatible t V
             then raise (E "type \'void\' has no size")
             else mkt (TSizeof t) I
   with
@@ -315,7 +301,7 @@ let rec typeexpr env { desc=edesc ; loc=loc } =
 (* Variable declaration *)
 let typevdec env { desc=vt,vid ; loc=loc } =
   let vt = wft env vt in
-  if vt = V
+  if compatible vt V
     then
       error loc ("variable or field \'"^vid^"\' declared void")
     else { env with
@@ -336,6 +322,13 @@ let typevdeclist env vl =
           (Sset.add vid s) t)
   in
   uni env [] Sset.empty vl
+
+let typeglobalvdec env ({ desc=vt,vid ; loc=loc } as h) =
+  if Smap.mem vid env.v
+    then error loc
+      ("previous declaration of \'"^vid^"\' was here")
+    else typevdec env h
+  
 (*****)
 
 (* Instruction typing *)
@@ -384,10 +377,59 @@ and typei t0 env { desc=idesc ; loc=loc } =
   with E s -> error loc s
 (*****)
 
-(* Program typing *)
+(* Functions and Constructors *)
+let typeconstr =
+  let free = ref 0 in
+  fun env (t,vl) ->
+  let members = Array.make (List.length vl) V in
+  let t,id = match t with
+    | Struct id -> (S !free),id
+    | Union id -> (U !free),id
+    | _ -> invalid_arg "Not a constr" in
+  let env = { env with su=Smap.add id t env.su } in
+  let rec fill i = function
+    | [] -> ()
+    | { desc=vt,id ; loc=loc }::t ->
+      let vt=wft env vt in
+      if compatible vt V
+        then
+          error loc ("variable or field \'"^id^"\' declared void")
+        else
+          members.(i) <- vt;
+     fill (i+1) t
+  in
+  fill 0 vl;
+  incr free;
+  env,(t,members)
 
+let typefun =
+  let free = ref 0 in
+  fun env loc (t,id,arg,decl,instr) ->
+    let t = wft env t in
+    let env,arg = typevdeclist env arg in
+    let argt = List.map (fun (t,_) -> t) arg in
+    let env = { env with f=Smap.add id (t,!free,argt) env.f } in
+    let tf = t,!free,arg,typei t env {desc=Bloc(decl,instr);loc=loc} in
+    incr free;
+    env,tf
+(*****)
+
+(* Program typing *)
 let type_prog ast =
-  assert false
+  let rec type_declist env cl fl = function
+    | [] -> let vl = assert false (**) in cl,fl,vl
+    | (Ast.V vd)::t -> type_declist (typeglobalvdec env vd) cl fl t
+    | (Dec {desc=d;loc=loc})::t ->
+      match d with
+        | Typ (ty,v) -> let env,c = typeconstr env (ty,v) in
+            type_declist env (c::cl) fl t
+        | Fct (rt,id,arg,d,i) ->
+          let env,f = typefun env loc (rt,id,arg,d,i) in
+            type_declist env cl (f::fl) t
+  in type_declist {empty with
+    f=Smap.add "putchar" (I,-1,[I]) (Smap.singleton "sbrk"
+(P(1,V),-2,[I]))} [] [] ast
+  
 (*****)
 
 (*____\o/_______________/[_____S_H_A_R_K___A_T_T_A_C_K___!___*)

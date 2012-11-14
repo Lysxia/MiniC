@@ -32,7 +32,7 @@ and tedesc =
   | TSizeof of tt
 
 
-type tvstmt = tt*tident
+type tvdec = tt*tident
 
 type tinstr =
   | TNop
@@ -40,13 +40,13 @@ type tinstr =
   | TIf of texpr*tinstr*tinstr
   | TWhile of texpr*tinstr
   | TFor of texpr list*texpr*texpr list*tinstr
-  | TBloc of tvstmt list*tinstr list
+  | TBloc of tvdec list*tinstr list
   | TReturn of texpr option
 
 type tconstr = tt*tt array
 
-type tfct = tt*tvstmt list*tvstmt list*tinstr list
+type tfct = tt*tident*tvdec list*tinstr
 
-type tfile = tconstr Imap.t*tfct list*tvstmt list
+type tfile = tconstr list*tfct list*tvdec list
 
 val type_prog : Ast.file -> tfile

@@ -11,7 +11,7 @@
   let mk_pointer t n =
     if n = 0 then t else Point (n,t) 
 
-  let vstmt_of_var_list t { desc=n,x ; loc=loc } =
+  let vdec_of_var_list t { desc=n,x ; loc=loc } =
     { desc=mk_pointer t n,x ; loc=loc }
 
 %}
@@ -40,28 +40,28 @@
 
 %%
 prog:
-  stmt* EOF
+  dec* EOF
   { List.flatten $1 }
 
-stmt:
-  | vstmt_list	{ List.map (fun v -> V v) $1 }
-  | s=tstmt | s=fstmt
-    { [Stmt { desc=s ; loc=loc $startpos(s) $endpos(s) }] }
+dec:
+  | vdec_list	{ List.map (fun v -> V v) $1 }
+  | s=tdec | s=fdec
+    { [Dec { desc=s ; loc=loc $startpos(s) $endpos(s) }] }
 
-vstmt_list:
+vdec_list:
   | ty separated_nonempty_list(COMMA,var) SEMICOLON
-      { List.map (vstmt_of_var_list $1) $2 }
+      { List.map (vdec_of_var_list $1) $2 }
 
-tstmt:
-  | STRUCT IDENT LBRC vstmt_list* RBRC SEMICOLON
+tdec:
+  | STRUCT IDENT LBRC vdec_list* RBRC SEMICOLON
     { Typ (Struct $2, List.flatten $4) }
-  | UNION IDENT LBRC vstmt_list* RBRC SEMICOLON
+  | UNION IDENT LBRC vdec_list* RBRC SEMICOLON
     { Typ (Union $2, List.flatten $4) }
 
-fstmt:
+fdec:
   t=ty count=star_count f=IDENT
     LPAR args=separated_list(COMMA,arg) RPAR
-    LBRC vslist=vstmt_list* ilist=instr* RBRC
+    LBRC vslist=vdec_list* ilist=instr* RBRC
     { Fct (mk_pointer t count,f,args,List.flatten vslist,ilist) }
 
 var:
@@ -147,6 +147,6 @@ idesc:
       test=expr? SEMICOLON
       inc=separated_list(COMMA,expr) RPAR i=instr
 	{ For (init,test,inc,i) }
-  | LBRC vstmt_list* instr* RBRC 	{ Bloc (List.flatten $2,$3) }
+  | LBRC vdec_list* instr* RBRC 	{ Bloc (List.flatten $2,$3) }
   | RETURN expr? SEMICOLON		{ Return $2 }
  

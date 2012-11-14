@@ -2,7 +2,7 @@
  *  call gcc -c 'this_file.c'
  */
 
-#define TEST 25
+#define TEST 26
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -174,6 +174,10 @@ struct a a(){
     int a;
     return a;
 }
+#endif
+
+#if TEST==26
+struct a{ struct a a};
 #endif
 
 int main()
