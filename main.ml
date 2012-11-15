@@ -22,10 +22,15 @@ let () =
     | [] ->
       Printf.eprintf "No file to compile specified.\n%s\n" usage;
       exit 2;
-    | [h] -> (try
-      assert false
+    | [file] -> (try
+        let h = open_in file in
+        let lexbuf = Lexing.from_channel h in
+        let ast = Parser.prog Lexer.token lexbuf in
+        if !parse_only then exit 0;
+        let tast = Typing.type_prog ast in
+        exit 0;
       with
-        | Error.E _ -> exit 1
+        | Error.E (sp,ep,s) -> Error.prerr sp ep s; exit 1;
         | _ -> Printf.eprintf "Unexpected error.\n";
           exit 2)
     | _ ->

@@ -35,7 +35,7 @@ and edesc =
   | Sizeof of t
 
 
-type vstmt = vdesc loc
+type vdec = vdesc loc
 
 and vdesc = t*ident
 
@@ -49,17 +49,17 @@ and idesc =
   | If of expr*instr*instr
   | While of expr*instr
   | For of expr list*expr option*expr list*instr
-  | Bloc of vstmt list*instr list
+  | Bloc of vdec list*instr list
   | Return of expr option
 
 
-type stmt = 
-  | Stmt of sdesc loc
-  | V of vstmt
+type dec = 
+  | Dec of ddesc loc
+  | V of vdec
 
-and sdesc =
-  | Typ of t*vstmt list
-  | Fct of t*ident*vstmt list*vstmt list*instr list
+and ddesc =
+  | Typ of t*vdec list
+  | Fct of t*ident*vdec list*vdec list*instr list
 
-type file = stmt list
+type file = dec list
 

@@ -49,4 +49,9 @@ type tfct = tt*tident*tvdec list*tinstr
 
 type tfile = tconstr list*tfct list*tvdec list
 
+(*
+val type_expr : Ast.expr -> texpr
+val type_instr : Ast.instr -> tinstr
+*)
+
 val type_prog : Ast.file -> tfile

@@ -107,7 +107,7 @@ let error loc s =
 
 let su_id = function
   | U i | S i -> i
-  | _ -> invalid_arg "Not a struct nor union id"
+  | _ -> assert false
 (*****)
 
 (* Type relationships *)
@@ -385,7 +385,8 @@ let typeconstr =
   let t,id = match t with
     | Struct id -> (S !free),id
     | Union id -> (U !free),id
-    | _ -> invalid_arg "Not a constr" in
+    | _ -> assert false
+  in
   let env = { env with su=Smap.add id t env.su } in
   let rec fill i = function
     | [] -> ()

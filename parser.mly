@@ -34,9 +34,11 @@
 %right NOT INCR DECR ADDRESS /*UStar UAdd USub*/
 %left ARROW DOT LBKT
 
-%start prog
+%start prog expr instr
 
 %type <Ast.file> prog
+%type <Ast.expr> expr
+%type <Ast.instr> instr
 
 %%
 prog:

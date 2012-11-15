@@ -78,7 +78,7 @@ and print_idesc = function
 
 let rec print_stmt = function
   | V v -> print_vs v; print_newline ();
-  | Stmt d -> print_sdesc d.desc; print_newline ();
+  | Dec d -> print_sdesc d.desc; print_newline ();
 
 and print_sdesc = function
   | Typ (t,_) (*| Typ (t,_)*) -> print_string "Constructor"; print_type t
