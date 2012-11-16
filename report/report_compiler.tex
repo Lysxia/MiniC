@@ -52,18 +52,18 @@ après que le typeur soit entièrement écrit.
 Seules les erreurs de syntaxe étaient corrigées
 pendant la majorité de la rédaction du projet. 
 
-De plus, les conflits de lecture/réduction du parseur ont été en nombre
-assez réduit dès la première compilation, et l'ajout d'une règle de
-priorité n'en a laissé qu'un seul, ({\bf if} \dots {\bf else} \dots) 
-ce qui apparaît plutôt miraculeux pour un premier usage de l'outil
-menhir.
-
 Finalement le débuggage n'a pas posé de problème majeur, probablement
 parce que le projet (en tout cas cette partie) n'est pas complexe d'un
 point de vue algorithmique ; il s'agissait surtout de retranscrire les
 règles de typage dans un parcours d'arbre. Les fichiers de
 tests semblent maintenant gérés correctement, même si quelques
 imprécisions subsistent.
+
+De plus, les conflits de lecture/réduction du parseur ont été en nombre
+assez réduit dès la première compilation, et l'ajout d'une règle de
+priorité n'en a laissé qu'un seul, ({\bf if} \dots {\bf else} \dots) 
+ce qui apparaît plutôt miraculeux pour un premier usage de l'outil
+menhir.
 
 En cas d'ambiguïté dans le sujet, gcc a été la référence. (ainsi que pour
 les messages d'erreurs que j'ai repris)
