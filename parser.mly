@@ -34,16 +34,22 @@
 %right NOT INCR DECR ADDRESS /*UStar UAdd USub*/
 %left ARROW DOT LBKT
 
-%start prog expr instr
+%start debugexpr debuginstr prog
 
+%type <Ast.expr> debugexpr
+%type <Ast.instr> debuginstr
 %type <Ast.file> prog
-%type <Ast.expr> expr
-%type <Ast.instr> instr
 
 %%
 prog:
   dec* EOF
   { List.flatten $1 }
+
+debugexpr:
+  expr EOF {$1}
+
+debuginstr:
+  instr EOF {$1}
 
 dec:
   | vdec_list	{ List.map (fun v -> V v) $1 }

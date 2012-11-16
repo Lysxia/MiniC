@@ -1,117 +1,92 @@
 open Ast
+open Format
 
-let d = ref 0
+let rec typestring = function
+  | Struct s -> "struct "^s
+  | Union s -> "union "^s
+  | Point (n,t) ->
+      (typestring t)^(String.make n '*')
+  | Int -> "int"
+  | Char -> "char"
+  | Void -> "void"
 
-let margin () =
-  print_string (String.make (!d*4) ' ')
+let rec print_separ_list f ch = function
+  | [] -> ()
+  | [h] -> f ch h
+  | h::t -> f ch h; fprintf ch ", ";
+      print_separ_list f ch t
 
-let print_type = function
-  | Struct s -> print_string "S s"
-  | Union s -> print_string "U s"
-  | Point _ -> print_string "'t*"
-  | _ -> print_string "'t"
+let rec print_expr h e =
+  print_edesc h e.desc
 
-let rec print_expr e =
-  print_edesc e.desc
+and print_edesc h = function
+  | Cint i -> fprintf h "%d" i
+  | Cstring s -> fprintf h "\"%s\"" s
+  | Ident s -> fprintf h "%s" s
+  | Dot (e,s) -> fprintf h "%a.%s"
+      print_expr e s
+  | Assign (e1,e2) -> fprintf h "(%a = %a)"
+      print_expr e1 print_expr e2
+  | Call (f,a) -> fprintf h "%s(%a)" f
+      (print_separ_list print_expr) a
+  | Unop (_,e) -> fprintf h "~U(%a)" print_expr e
+  | Binop (_,e1,e2) ->
+      fprintf h "(%a+%a)" print_expr e1 print_expr e2
+  | Sizeof t -> fprintf h "sizeof(%s)" (typestring t)
 
-and print_edesc = function
-  | Cint i -> Printf.printf "%d" i
-  | Cstring s | Ident s -> Printf.printf "%s" s
-  | Dot (e,s) -> print_string "(";
-     print_expr e;
-     print_string ")";
-     Printf.printf ".%s" s
-  | Assign (e1,e2) -> print_string "(";
-     print_expr e1;
-     print_string ")=";
-     print_expr e2;
-  | Call (f,a) -> print_string (f^"(");
-      List.iter (fun e -> print_expr e; print_string ",") a;
-      print_string (")"^(if a=[] then "" else "\b"))
-  | Unop (_,e) -> print_string "UNOP(";
-      print_expr e;
-      print_string ")";
-  | Binop (_,e1,e2) -> print_string "(";
-      print_expr e1;
-      print_string ")+(";
-      print_expr e2;
-  | Sizeof _ -> print_string "sizeof()"
+let print_vdec h { desc=t,id ; loc=_ } =
+  fprintf h "%s %s" (typestring t) id
 
-let print_vs v =
-  let name (_,id) = id in
-  print_string ("var "^(name v.desc))
+let rec print_i h = function
+  | Instr i -> fprintf h "%a;@," print_idesc i.desc
+  | Expr e -> fprintf h "%a;@," print_expr e
 
-let rec print_i = function
-  | Instr i -> margin (); print_idesc i.desc
-  | Expr e -> margin (); print_expr e; print_newline ()
+and print_idesc h =
+  function
+  | Nop -> ()
+  | If (e,i1,i2) -> fprintf h "if (%a)@[<hv>@,%a@,else %a@]"
+      print_expr e print_i i1 print_i i2
+  | While (e,i) -> fprintf h "while (%a)@[<hv>@,%a@]"
+      print_expr e print_i i
+  | For (e1,e2,e3,i) -> fprintf h "for (%a ; %a ; %a)@[<hv>@,%a@]"
+      (print_separ_list print_expr) e1
+      (fun h -> function None -> () | Some e -> print_expr h e) e2
+      (print_separ_list print_expr) e3 print_i i
+  | Bloc (v,i) -> fprintf h "{@,%a%a}"
+      (fun h -> List.iter (fun v -> fprintf h "%a;@ " print_vdec v;)) v
+      (fun h -> List.iter (print_i h)) i
+  | Return (Some e) -> fprintf h "return %a"
+      print_expr e
+  | Return None -> fprintf h "return"
 
-and print_idesc = function
-  | Nop -> ();
-  | If (e,i1,i2) -> print_string "if (";
-      print_expr e;
-      print_string ")\n";
-      incr d;
-      print_i i1;
-      decr d;
-      print_string "\n"; margin ();
-      print_string "else\n";
-      incr d;
-      print_i i2;
-      decr d;
-  | While (e,i) -> print_string "while (";
-      print_expr e;
-      print_string ")\n";
-      incr d;
-      print_i i;
-      decr d;
-  | For (e1,e2,e3,i) -> print_string "for (...)";
-  | Bloc (v,i) ->
-      print_string "\b\b\b\b{\n";
-      List.iter (fun v -> margin(); print_vs v; print_newline()) v;
-      List.iter print_i i;
-      print_string "\b\b\b\b}\n";
-  | Return e ->
-      print_string "Return ";
-      (match e with None -> ()
-               | Some e -> print_expr e);
-    print_newline ()
 
-let rec print_stmt = function
-  | V v -> print_vs v; print_newline ();
-  | Dec d -> print_sdesc d.desc; print_newline ();
+let rec print_dec h = function
+  | V v -> fprintf h "%a;@\n" print_vdec v
+  | Dec d -> print_ddesc h d.desc; force_newline ()
 
-and print_sdesc = function
-  | Typ (t,_) (*| Typ (t,_)*) -> print_string "Constructor"; print_type t
-  | Fct (_,f,arg,v,i) -> print_string (f^"(");
-      List.iter (fun v -> print_vs v; print_string ",") arg;
-      print_string (if arg=[] then ")\n" else "\b)\n");
-      incr d;
-      List.iter (fun v -> margin (); print_vs v; print_newline()) v;
-      List.iter print_i i
+and print_ddesc h = function
+  | Typ (t,vl) -> fprintf h "%s {@[@ %a@]}"
+      (typestring t)
+      (fun h -> List.iter (fun v -> fprintf h "%a;@ " print_vdec v;)) vl
+  | Fct (t,f,arg,v,i) -> fprintf h "%s %s(%a) @[<hv>%a@]"
+      (typestring t) f
+      (print_separ_list print_vdec) arg
+      print_idesc (Bloc (v,i))
 
-let print_ast =
-  List.iter print_stmt
-
-let err_loc file buf =
-  let st = Lexing.lexeme_start_p buf in
-  let en = Lexing.lexeme_end_p buf in
-  Printf.fprintf stderr "File \"%s\", line %d, characters %d-%d:\n"
-    file
-    st.Lexing.pos_lnum
-    (st.Lexing.pos_cnum-st.Lexing.pos_bol)
-    (en.Lexing.pos_cnum-en.Lexing.pos_bol)
+let print_ast h =
+  List.iter (print_dec h)
 
 let () =
   for i = 1 to Array.length Sys.argv - 1 do
-    Printf.printf "File %s\n" Sys.argv.(i);
     let h = open_in Sys.argv.(i) in
     let buf = Lexing.from_channel h in
     begin
       try
-        print_ast (Parser.prog Lexer.token buf);
+        Format.printf "File %s\n@?" Sys.argv.(i);
+        print_ast std_formatter (Parser.prog Lexer.token buf);
       with
-        | Parser.Error -> err_loc Sys.argv.(i) buf;
-            Printf.fprintf stderr "Syntax error\n" 
+        | Error.E (sp,ep,s) -> Error.prerr Sys.argv.(i) sp ep s
+        | Parser.Error -> Error.catch Sys.argv.(i) buf
     end;
     close_in h;
     print_newline ()

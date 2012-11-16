@@ -74,16 +74,16 @@ type tfile =
 
 type env = {
   f : (tt*tident*tt list) Smap.t ; (* functions *)
-  su : tt Smap.t; (* defined structure/union types *)
-  sm : (tt*tident) Smap.t Imap.t ; (* s/u members *)
+  constr : tt Smap.t; (* defined structure/union types *)
+  mb : (tt*tident) Smap.t Imap.t ; (* s/u members *)
   v : (tt*tident) Smap.t ; (* variables *)
   free : int ;
   }
 
 let empty = {
   f=Smap.empty;
-  su=Smap.empty;
-  sm=Imap.empty;
+  constr=Smap.empty;
+  mb=Imap.empty;
   v=Smap.empty;
   free=0;}
 
@@ -91,23 +91,23 @@ let globals = ref empty
 
 (* For error reporting only 
  * Find structure/union type identifier *)
-let su_string_of_tid = Hashtbl.create 7
+let constr_of_tid = Hashtbl.create 7
 
 let rec stringtype = function
   | V -> "void"
   | I -> "int"
   | C -> "char"
-  | S s -> "struct "^(Hashtbl.find su_string_of_tid s)
-  | U s -> "union "^(Hashtbl.find su_string_of_tid s)
+  | S s -> "struct "^(Hashtbl.find constr_of_tid s)
+  | U s -> "union "^(Hashtbl.find constr_of_tid s)
   | P (n,t) -> (stringtype t)^String.make n '*'
   | Null -> "typenull"
 
 let error loc s =
   raise (Error.E (loc.start_p,loc.end_p,s))
 
-let su_id = function
+let constr_id = function
   | U i | S i -> i
-  | _ -> assert false
+  | _ -> raise (E "not a structure or union")
 (*****)
 
 (* Type relationships *)
@@ -119,7 +119,7 @@ let mkpnt = function
 let deref = function
   | P (1,t) -> t
   | P (n,t) when n>0 -> P (n-1,t)
-  | _ -> raise (E "is not a pointer")
+  | _ -> raise (E "not a pointer")
 
 let addable = function
   | I | C | Null -> true
@@ -133,7 +133,7 @@ let compatible t1 t2 = match t1,t2 with
   | _ -> false
 
 let num t =
-  compatible t I || compatible t (P (73,I))
+  compatible t Null || compatible t (P (1,V))
 
 (*****)
 
@@ -149,7 +149,7 @@ let rec wft (* well formed type*) env = function
   | Struct s ->
       begin
         try
-          match Smap.find s env.su with
+          match Smap.find s env.constr with
             | S i -> S i
             | _ -> raise Not_found
         with
@@ -158,7 +158,7 @@ let rec wft (* well formed type*) env = function
       end
   | Union s ->
       try
-        match Smap.find s env.su with
+        match Smap.find s env.constr with
           | U i -> U i
           | _ -> raise Not_found
       with
@@ -175,9 +175,10 @@ let mkt d t = { tdesc=d ; t=t }
 (* Expression typing *)
 let typedot env e i =
   try
-    let t,i = Smap.find i (Imap.find (su_id e.t) env.sm) in
+    let t,i = Smap.find i (Imap.find (constr_id e.t) env.mb) in
     mkt (TDot (e,i)) t
   with
+    | E s -> raise (E ("request for member \'"^i^"in something "^s))
     | Not_found -> raise (E ("\'"^(stringtype e.t)^
         "\' has no member named \'"^i^"\'"))
 
@@ -236,7 +237,9 @@ let typebinop =
   let arith_rule o (* (+,-,*,/,%,||,&&) *) e1 e2 =
     if compatible e1.t e2.t && compatible e1.t I
       then mkt (TBinop (o,e1,e2)) I
-      else raise (E "operands are not numerically compatible")
+      else raise (E
+        ("invalid operands to binary operator (have \'"^
+        (stringtype e1.t)^"\' and \'"^(stringtype e2.t)^"\')"))
   in
   let add_rule (* (+) *) e1 e2 =
     match e1.t,e2.t with
@@ -257,7 +260,9 @@ let typebinop =
   | Eq | Neq | Lt | Leq | Gt | Geq ->
       if compatible e1.t e2.t && num e1.t
         then mkt (TBinop (o,e1,e2)) I
-        else raise (E "operands are not numerically compatible")
+        else raise (E
+          ("invalid operands to binary (bool) operator (have \'"^
+          (stringtype e1.t)^"\' and \'"^(stringtype e2.t)^"\')"))
   | Mul | Div | Mod | And | Or ->
       arith_rule o e1 e2
   | Add -> add_rule e1 e2
@@ -270,7 +275,13 @@ let rec typeexpr env { desc=edesc ; loc=loc } =
       | Cint 0 -> mkt (TCi 0) Null
       | Cint i -> mkt (TCi i) I
       | Cstring s -> mkt (TCs s) (P (1,C))
-      | Ident x -> let t,i = Smap.find x env.v in
+      | Ident x ->
+          let t,i =
+            try 
+              Smap.find x env.v
+            with
+              | Not_found -> error loc ("\'"^x^"\' undeclared")
+          in
           mkt (TId i) t
       | Dot (e,i) ->
           let e = typeexpr env e in
@@ -296,23 +307,30 @@ let rec typeexpr env { desc=edesc ; loc=loc } =
             else mkt (TSizeof t) I
   with
     | E s -> error loc s
+
+(* Function for debugging purposes only *)
+let type_expr = typeexpr empty
 (*****)
 
 (* Variable declaration *)
 let typevdec env { desc=vt,vid ; loc=loc } =
-  let vt = wft env vt in
-  if compatible vt V
-    then
-      error loc ("variable or field \'"^vid^"\' declared void")
-    else { env with
-      v=Smap.add vid (vt,env.free) env.v;
-      free=env.free+1 }
+  try
+    let vt = wft env vt in
+    if compatible vt V
+      then
+        raise (E ("variable or field \'"^vid^"\' declared void"))
+      else { env with
+        v=Smap.add vid (vt,env.free) env.v;
+        free=env.free+1 }
+  with
+    | E s -> error loc s
 
 (* Checks name unicity
- * (in a declaration sequence inside one block) *)
+ * (in a declaration sequence inside one block
+ * or among function arguments) *)
 let typevdeclist env vl =
   let rec uni env tvl s = function
-  | [] -> env,tvl
+  | [] -> env,List.rev tvl
   | ({ desc=_,vid ; loc=loc } as h)::t ->
       if Sset.mem vid s
         then error loc
@@ -375,6 +393,9 @@ and typei t0 env { desc=idesc ; loc=loc } =
                (stringtype e.t)^"\' but \'"^(stringtype t0)^
                "\' was expected"))
   with E s -> error loc s
+
+(* Function for debugging purposes only *)
+let type_instr = typeinstr V empty
 (*****)
 
 (* Functions and Constructors *)
@@ -387,38 +408,40 @@ let typeconstr =
     | Union id -> (U !free),id
     | _ -> assert false
   in
-  let env = { env with su=Smap.add id t env.su } in
-  let rec fill i = function
-    | [] -> ()
-    | { desc=vt,id ; loc=loc }::t ->
+  let env = { env with constr=Smap.add id t env.constr } in
+  let rec fill i mb = function
+    | [] -> mb
+    | { desc=vt,id ; loc=loc }::t -> try
       let vt=wft env vt in
       if compatible vt V
-        then
-          error loc ("variable or field \'"^id^"\' declared void")
-        else
-          members.(i) <- vt;
-     fill (i+1) t
+        then raise (E ("variable or field \'"^id^"\' declared void"));
+      members.(i) <- vt;
+      fill (i+1) (Smap.add id (vt,i) mb) t
+    with
+       | E s -> error loc s
   in
-  fill 0 vl;
+  Hashtbl.add constr_of_tid !free id;
+  let env = { env with mb=Imap.add !free (fill 0 Smap.empty vl) env.mb } in
   incr free;
-  env,(t,members)
+  env, (t,members)
 
 let typefun =
   let free = ref 0 in
   fun env loc (t,id,arg,decl,instr) ->
     let t = wft env t in
-    let env,arg = typevdeclist env arg in
+    let env2,arg = typevdeclist env arg in
     let argt = List.map (fun (t,_) -> t) arg in
-    let env = { env with f=Smap.add id (t,!free,argt) env.f } in
-    let tf = t,!free,arg,typei t env {desc=Bloc(decl,instr);loc=loc} in
+    let new_ef = Smap.add id (t,!free,argt) env.f in
+    let env2 = { env2 with f=new_ef } in
+    let tf = t,!free,arg,typei t env2 {desc=Bloc(decl,instr);loc=loc} in
     incr free;
-    env,tf
+    { env with f=new_ef },tf
 (*****)
 
 (* Program typing *)
 let type_prog ast =
   let rec type_declist env cl fl = function
-    | [] -> let vl = assert false (**) in cl,fl,vl
+    | [] -> let vl = Smap.fold (fun _ d vl -> d::vl) env.v [] in cl,fl,vl
     | (Ast.V vd)::t -> type_declist (typeglobalvdec env vd) cl fl t
     | (Dec {desc=d;loc=loc})::t ->
       match d with
@@ -427,9 +450,11 @@ let type_prog ast =
         | Fct (rt,id,arg,d,i) ->
           let env,f = typefun env loc (rt,id,arg,d,i) in
             type_declist env cl (f::fl) t
-  in type_declist {empty with
-    f=Smap.add "putchar" (I,-1,[I]) (Smap.singleton "sbrk"
-(P(1,V),-2,[I]))} [] [] ast
+  in
+  type_declist { empty with
+    f=Smap.add "putchar" (I,-1,[I])
+      (Smap.singleton "sbrk" (P(1,V),-2,[I])) }
+    [] [] ast
   
 (*****)
 

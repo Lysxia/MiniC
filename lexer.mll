@@ -5,6 +5,9 @@
   open Lexing
   open Parser
 
+  let raise_err lexbuf s =
+    raise (Error.E (lexeme_start_p lexbuf,lexeme_end_p lexbuf,s))
+
   let kwd_tbl =
     ["char", 	CHAR;
      "else", 	ELSE;
@@ -24,12 +27,12 @@
     fun s ->
       try List.assoc s kwd_tbl with _ -> IDENT s
 
-  (*let newline lexbuf =
-    let pos = lexbuf.lex_curr_p in
-    lexbuf.lex_curr_p <-
-      { pos with
-          pos_lnum = pos.pos_lnum + 1;
-          pos_bol = pos.pos_cnum }*)
+  let char_of_escape lexbuf = function
+    | 'n' -> '\n'
+    | 't' -> '\t'
+    | '\\' | '\'' as s -> s
+    | c -> raise_err lexbuf ("Unknown escape sequence \'"^
+        (String.make 1 c)^"\'")
 }
 
 let space = [' ' '\t']
@@ -43,8 +46,7 @@ let ident = (letter|'_') (letter|digit|'_')*
 let integer = digit* | ("0x" hexa+)
 
 let car = (['\032'-'\127']#['\\' '\'' '"'])
-          | "\\\\" | "\\\'" | "\\\""
-          | ("\\x" hexa hexa)
+let escape = "\\" | "n" | "\""
 
 rule token = parse
   | '\n'	{ new_line lexbuf; token lexbuf }
@@ -57,7 +59,7 @@ rule token = parse
   | ']' 	{ RBKT }
   | '{' 	{ LBRC }
   | '}' 	{ RBRC }
-  | ';' 	{ SEMICOLON}
+  | ';' 	{ SEMICOLON }
   | ',' 	{ COMMA }
   | '.' 	{ DOT }
   | "->"	{ ARROW }
@@ -83,22 +85,38 @@ rule token = parse
   | "0" octal+ as n 	{ CST (int_of_string ("0o"^n)) }
   | integer as n 	{ CST (int_of_string n) }
   | (digit|letter|'_')+	{
-      raise (Error.E (lexeme_start_p lexbuf,
-        lexeme_end_p lexbuf,"Not a number")) }
-  (* escape seq are not well supported *)
-  | "\"" (car* as s) "\"" { STR s }
+      raise_err lexbuf "Not a valid identifier or number" }
+  | "\"" 				{ STR (str lexbuf) }
+  | "\'" (car|'"' as c) "\'"		{ CST (int_of_char c) }
+  | "\'\\" (car as c) "\'"		{
+      CST (int_of_char (char_of_escape lexbuf c)) }
+  | "\'" ("\\x" hexa hexa as c) "\'"	{
+      c.[0] <- '0'; CST (int_of_string c) }
+  | "\'\\x" _ _ 	 		{
+      raise_err lexbuf "\\x used with no following hex digits"}
   | "/*"	{ comment lexbuf }
-  | "//" [^ '\n'] 	{ token lexbuf }
-  | "//" [^ '\n'] eof	{ EOF }
+  | "//" [^ '\n' ]* 	{ token lexbuf }
+  | "//" [^ '\n' ]* eof	{ EOF }
   | _ as c		{
-      raise (Error.E (lexeme_start_p lexbuf,
-        lexeme_end_p lexbuf,
-        "Illegal character: "^String.make 1 c)) }
+      raise_err lexbuf ("Illegal character: "^String.make 1 c) }
+
+and str = parse
+  | "\\"	{ escape lexbuf }
+  | car as c	{ (String.make 1 c)^str lexbuf }
+  | "\""	{ "" }
+  | _		{ raise_err lexbuf "Missing terminating \" character" }
+
+and escape = parse
+  | _ as c	{
+      (String.make 1 (char_of_escape lexbuf c))^str lexbuf }
+  | '"' 	{ "\""^str lexbuf }
+  | "x" (hexa hexa as n)
+      { (String.make 1 (char_of_int (int_of_string ("0x"^n))))^str lexbuf }
+  | "x" _ _	{
+      raise_err lexbuf "\\x used with no following hex digits" }
 
 and comment = parse
   | '\n'	{ new_line lexbuf; comment lexbuf }
   | "*/"	{ token lexbuf }
   | _   	{ comment lexbuf }
-  | eof 	{
-      raise (Error.E (lexeme_start_p lexbuf,
-        lexeme_end_p lexbuf,"Unterminated comment")) }
+  | eof 	{ raise_err lexbuf "Unterminated comment" }

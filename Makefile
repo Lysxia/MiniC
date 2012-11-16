@@ -2,13 +2,13 @@
 # Li-yao Xia
 #
 
-CMO=error.cmo lexer.cmo parser.cmo typing.cmo main.cmo
+CMO=error.cmo lexer.cmo parser.cmo typing.cmo
 GENERATED=lexer.ml parser.ml parser.mli
 PARSER_GEN=parser.automaton parser.conflicts
 BIN=main
 
-$(BIN):$(CMO)
-	ocamlc -o $(BIN) $(CMO)
+$(BIN):$(CMO) main.cmo
+	ocamlc -o $(BIN) $(CMO) $(BIN).cmo
 
 
 .SUFFIXES: .mli .ml .cmi .cmo .mll .mly
@@ -31,6 +31,13 @@ $(BIN):$(CMO)
 
 clean:
 	rm -f *.cm[io] *.o *~ $(GENERATED) $(PARSER_GEN)
+
+#
+#TESTING
+#
+
+parser_test:$(CMO) parser_test.cmo
+	ocamlc -o parser_test $(CMO) parser_test.ml
 
 parser.ml: ast.cmi
 
