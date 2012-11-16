@@ -1,0 +1,111 @@
+\documentclass[a4paper]{article}
+
+\usepackage[french]{babel}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{fullpage}
+\usepackage{pgf}
+\usepackage{tikz}
+
+\begin{document}
+
+\title{Compilateur MiniC}
+\author{Li-yao Xia}
+\date{\today}
+
+\maketitle
+%\normalsize
+
+\section{Commentaires généraux}
+
+Comme je ne savais pas par où commencer,
+j'ai choisi d'écrire le compilateur dans l'ordre des différentes étapes
+de l'analyse. 
+
+Lexeur -> Parseur -> Typeur
+
+Les fichiers qui composent mon programme sont :
+\begin{itemize}
+  \item {\it lexer.mll}
+  \item {\it ast.mli} - Décrit le type d'arbre de syntaxe abstraite décoré en
+sortie du parseur.
+  \item {\it parser.mly}
+  \item {\it error.ml} - Fichier commun à tout le programme, de gestion
+d'erreurs (affichage des messages d'erreur)
+  \item {\it typing.ml/.mli}
+  \item {\it main.ml}
+\end{itemize}
+
+\section{Choix et difficultés}
+
+Je m'y suis pris assez tôt, donc j'avais globalement fini le
+lexeur et le parseur avant qu'ils ne soient abordés dans le cours.
+J'ai un peu revu le programme après chaque cours concerné pour effectuer
+des simplifications et factoriser du code par des méthodes reprises du
+cours. 
+
+Un aspect de mon travail qui aurait pu me faire perdre beaucoup de temps est que 
+j'ai écrit de grandes parties de mon programme sans prendre le temps de
+vérifier leur correction. Des tests ont été faits seulement une fois le
+parseur terminé (affichage de l'AST, fichier absent de l'archive), puis 
+après que le typeur soit entièrement écrit.
+Seules les erreurs de syntaxe étaient corrigées
+pendant la majorité de la rédaction du projet. 
+
+De plus, les conflits de lecture/réduction du parseur ont été en nombre
+assez réduit dès la première compilation, et l'ajout d'une règle de
+priorité n'en a laissé qu'un seul, ({\bf if} \dots {\bf else} \dots) 
+ce qui apparaît plutôt miraculeux pour un premier usage de l'outil
+menhir.
+
+Finalement le débuggage n'a pas posé de problème majeur, probablement
+parce que le projet (en tout cas cette partie) n'est pas complexe d'un
+point de vue algorithmique ; il s'agissait surtout de retranscrire les
+règles de typage dans un parcours d'arbre. Les fichiers de
+tests semblent maintenant gérés correctement, même si quelques
+imprécisions subsistent.
+
+En cas d'ambiguïté dans le sujet, gcc a été la référence. (ainsi que pour
+les messages d'erreurs que j'ai repris)
+
+Des considérations de complexité et de simplicité m'ont amené à 
+différentes tentatives d'optimisation, pour beaucoup futiles et prises de
+tête :
+
+\begin{itemize}
+  \item convertir une boucle {\bf for} en boucle {\bf while} au moment du
+parsing afin d'avoir un cas de moins à traiter dans la suite. Le code qui
+résultait de cette "amélioration" n'était pas agréable du tout, j'ai
+finalement abandonné cette idée.
+  \item simplifier mon AST, d'où une certaine assymétrie à certains
+niveaux par rapport à la grammaire fournie dans le sujet : je ne localise
+pas les instructions du type {\bf expression;} ou les déclarations de
+variables car ceci est déjà fait à un niveau plus bas dans l'arbre.
+  \item à la sortie du typage, convertir les identifieurs en entiers
+afin de diminuer les temps de recherche. Sur les machines modernes cette
+conversion est plutôt accessoire mais j'ai tenu à le faire. 
+\end{itemize}
+
+En contraste avec ces maniaqueries, j'ai reporté le traitement de
+certains cas particuliers à la fin de cette partie du projet.
+
+\begin{itemize}
+  \item caractères et chaînes de caractères : les séquences
+d'échappement et les codes ascii n'étaient pas correctement lus par le
+lexeur. On se contentait de recopier le code sans tenir compte des
+caractères spéciaux. Le programme actuel supporte ces spécifications mais
+le code me semble plutôt redondant dans sa forme actuelle.
+  \item entiers : les {\bf int} en C sont représentés sur 32 bits tandis
+qu'en OCaml ils le sont sur 31. La librairie {\bf Int32} m'a dispensé de
+définir des types supplémentaires et d'écrire des fonctions de conversion 
+\end{itemize}
+
+Il reste enfin des points à améliorer :
+
+\begin{itemize}
+  \item {\it shift/reduce conflict} {\bf if} \dots {\bf else} \dots
+\end{itemize}
+
+\end{document}
+
+

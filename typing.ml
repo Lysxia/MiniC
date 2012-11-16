@@ -39,7 +39,7 @@ type tunop = Ast.unop
 type texpr = tedesc typed
 
 and tedesc =
-  | TCi of int
+  | TCi of Int32.t
   | TCs of string
   | TId of tident
   | TDot of texpr*tident
@@ -272,7 +272,7 @@ let typebinop =
 let rec typeexpr env { desc=edesc ; loc=loc } =
   try
     match edesc with
-      | Cint 0 -> mkt (TCi 0) Null
+      | Cint i when i=Int32.zero -> mkt (TCi Int32.zero) Null
       | Cint i -> mkt (TCi i) I
       | Cstring s -> mkt (TCs s) (P (1,C))
       | Ident x ->
@@ -369,7 +369,7 @@ and typei t0 env { desc=idesc ; loc=loc } =
             else raise (E ("used \'"^(stringtype e.t)^
               "\' type value where scalar is required"))
       | For (el1,e,el2,i) -> let e = match e with
-            | None -> mkt (TCi 1) I
+            | None -> mkt (TCi Int32.one) I
             | Some e -> typeexpr env e in
           if num e.t
             then TFor (

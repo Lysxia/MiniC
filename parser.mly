@@ -16,7 +16,7 @@
 
 %}
 
-%token <int> CST
+%token <Int32.t> CST
 %token <string> IDENT STR
 %token CHAR ELSE FOR IF INT RETURN SIZEOF STRUCT UNION VOID WHILE
 %token STAR LPAR RPAR LBKT RBKT LBRC RBRC EOF
@@ -31,8 +31,9 @@
 %left LT LEQ GT GEQ
 %left PLUS MINUS
 %left STAR DIV MOD
-%right NOT INCR DECR ADDRESS /*UStar UAdd USub*/
+%right INCR DECR Unop
 %left ARROW DOT LBKT
+
 
 %start debugexpr debuginstr prog
 
@@ -110,7 +111,7 @@ edesc:
   | expr ASSIGN expr		{ Assign ($1,$3) }
   | f=IDENT LPAR args=separated_list(COMMA,expr) RPAR
 				{ Call (f,args) }
-  | u=unop e=expr		{ Unop(u,e) }
+  | u=unop e=expr %prec Unop		{ Unop(u,e) }
   | expr INCR			{ Unop(Incrs,$1) }
   | expr DECR			{ Unop(Decrs,$1) }
   | e1=expr o=binop e2=expr	{ Binop(o,e1,e2) }
@@ -123,7 +124,7 @@ edesc:
   | ADDRESS	{ Address }
   | NOT 	{ Not }
   | PLUS 	{ Uplus }
-  | MINUS	{ Uminus }
+  | MINUS 	{ Uminus }
   | STAR 	{ Star }
 
 %inline binop:
@@ -149,7 +150,7 @@ idesc:
   | SEMICOLON		 		{ Nop }
   | IF LPAR expr RPAR instr		{
       If ($3,$5,Instr {desc=Nop;loc=loc $endpos $endpos}) }
-  | IF LPAR expr RPAR instr ELSE instr 	{ If ($3,$5,$7) }
+  | IF LPAR expr RPAR instr ELSE instr  { If ($3,$5,$7) }
   | WHILE LPAR expr RPAR instr		{ While ($3,$5) }
   | FOR LPAR init=separated_list(COMMA,expr) SEMICOLON
       test=expr? SEMICOLON

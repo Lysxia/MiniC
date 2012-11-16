@@ -24,7 +24,7 @@ type unop = Incrp | Decrp | Incrs | Decrs (* Plus-plus/Minus-minus pre/suffix *)
 type expr = edesc loc
 
 and edesc =
-  | Cint of int
+  | Cint of Int32.t
   | Cstring of string
   | Ident of ident
   | Dot of expr*ident

@@ -24,13 +24,14 @@ let compile file =
   let lexbuf = Lexing.from_channel h in
   try
     let ast = Parser.prog Lexer.token lexbuf in
+    close_in h;
     if !parse_only then exit 0;
     let tast = Typing.type_prog ast in
     0;
   with
-    | Error.E (sp,ep,s) -> Error.prerr file sp ep s; 1
-    | Parser.Error -> Error.catch file lexbuf; 1
-    | _ -> Printf.eprintf "Unexpected error.\n%!"; 2
+    | Error.E (sp,ep,s) -> close_in h; Error.prerr file sp ep s; 1
+    | Parser.Error -> close_in h; Error.catch file lexbuf; 1
+    | _ -> close_in h; Printf.eprintf "Unexpected error.\n%!"; 2
 
 
 let () =

@@ -20,7 +20,7 @@ let rec print_expr h e =
   print_edesc h e.desc
 
 and print_edesc h = function
-  | Cint i -> fprintf h "%d" i
+  | Cint i -> fprintf h "%s" (Int32.to_string i)
   | Cstring s -> fprintf h "\"%s\"" s
   | Ident s -> fprintf h "%s" s
   | Dot (e,s) -> fprintf h "%a.%s"
@@ -29,9 +29,20 @@ and print_edesc h = function
       print_expr e1 print_expr e2
   | Call (f,a) -> fprintf h "%s(%a)" f
       (print_separ_list print_expr) a
-  | Unop (_,e) -> fprintf h "~U(%a)" print_expr e
-  | Binop (_,e1,e2) ->
-      fprintf h "(%a+%a)" print_expr e1 print_expr e2
+  | Unop (o,e) -> fprintf h "%s(%a)" 
+      (match o with
+         | Star -> "*" | Incrp -> "++"
+         | Incrs -> "+s" | Decrp -> "--"
+         | Decrs -> "-s" | Address -> "&"
+         | Not -> "!" | Uminus -> "-" | Uplus -> "+")
+      print_expr e
+  | Binop (o,e1,e2) ->
+      fprintf h "(%a%s%a)" print_expr e1
+        (match o with
+           | Or -> "||" | And -> "&&" | Eq | Neq -> "=?"
+           | Lt | Leq | Gt | Geq -> "<>"
+           | Add | Sub -> "+" | Mul | Div | Mod -> "%" )
+        print_expr e2
   | Sizeof t -> fprintf h "sizeof(%s)" (typestring t)
 
 let print_vdec h { desc=t,id ; loc=_ } =

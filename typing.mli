@@ -23,7 +23,7 @@ type tunop = Ast.unop
 type texpr = tedesc typed
 
 and tedesc =
-  | TCi of int
+  | TCi of Int32.t
   | TCs of string
   | TId of tident
   | TDot of texpr*tident
