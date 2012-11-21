@@ -45,4 +45,8 @@ parser.ml: ast.cmi
 
 typing.cmo: typing.cmi
 
+project:
+	@cp Makefile main.ml lexer.mll parser.mly ast.mli error.ml typing.ml typing.mli report/report_compiler.pdf parser_test.ml xia-liyao/
+	@tar -zcf xia-liyao.tgz xia-liyao
+
 include .depend

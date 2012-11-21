@@ -30,8 +30,9 @@ let compile file =
     0;
   with
     | Error.E (sp,ep,s) -> close_in h; Error.prerr file sp ep s; 1
+    | Error.Global s -> close_in h; Error.prgerr file s; 1
     | Parser.Error -> close_in h; Error.catch file lexbuf; 1
-    | _ -> close_in h; Printf.eprintf "Unexpected error.\n%!"; 2
+    | _ -> close_in h; Printf.fprintf stdout "Unexpected error.\n%!"; 2
 
 
 let () =
@@ -39,14 +40,14 @@ let () =
     Arg.parse speclist collect usage;
     let rec main = function
       | [] ->
-        Printf.eprintf "No file to compile specified.\n%s\n%!" usage;
+        Printf.fprintf stdout "No file to compile specified.\n%s\n%!" usage;
         exit 2;
       | [file] -> exit (compile file)
       | file::t -> if !batch
         then begin ignore (compile file); main t end
         else begin
-          Printf.eprintf "Too many arguments.\n%s\n%!" usage;
+          Printf.fprintf stdout "Too many arguments.\n%s\n%!" usage;
           exit 2; end
     in main !args
   with
-    | _ -> Printf.eprintf "Unexpected error.\n%!"; exit 2
+    | _ -> Printf.fprintf stdout "Unexpected error.\n%!"; exit 2

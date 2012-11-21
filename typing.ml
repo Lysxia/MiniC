@@ -440,8 +440,25 @@ let typefun =
 
 (* Program typing *)
 let type_prog ast =
+  let rec main_loc = function
+    | Dec { desc=Fct (_,"main",_,_,_) ; loc=loc }::_ ->
+      loc.start_p,loc.end_p
+    | _::t -> main_loc t
+    | [] -> raise Not_found
+  in
   let rec type_declist env cl fl = function
-    | [] -> let vl = Smap.fold (fun _ d vl -> d::vl) env.v [] in cl,fl,vl
+    | [] -> (try
+        match Smap.find "main" env.f with
+          | I,_,[] | I,_,[I;P(2,C)] -> 
+            let vl =
+              Smap.fold (fun _ d vl -> d::vl) env.v []
+            in cl,fl,vl
+          | _ -> let sp,ep = main_loc ast in
+          raise (Error.E (sp,ep,
+          "function main has incorrect prototype"));
+      with
+        | Not_found -> raise (Error.Global
+        "int main() or int main(int,char**) expected"))
     | (Ast.V vd)::t -> type_declist (typeglobalvdec env vd) cl fl t
     | (Dec {desc=d;loc=loc})::t ->
       match d with
