@@ -2,7 +2,7 @@
  *  call gcc -c 'this_file.c'
  */
 
-#define TEST 27
+#define TEST 29
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -172,12 +172,26 @@ int a(){
 struct a{};
 struct a a(){
     int a;
+    a();
     return a;
 }
+// Accepted
 #endif
 
 #if TEST==26
-struct a{ struct a a};
+struct a{ struct a a;};
+#endif
+
+#if TEST==28
+int a;
+char a;
+#endif
+
+#if TEST==29
+int m()
+{
+    return;
+}
 #endif
 
 int main()
@@ -196,8 +210,11 @@ int main()
       void a;
     #endif
     #if TEST==27
-      printf("
-	      ");
+      //printf("
+	//      ");
+    #endif
+    #if TEST==29
+      return m();
     #endif
     return 0;
 }

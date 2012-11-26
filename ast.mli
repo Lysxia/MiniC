@@ -61,5 +61,5 @@ and ddesc =
   | Typ of t*vdec list
   | Fct of t*ident*vdec list*vdec list*instr list
 
-type file = dec list
+type file = dec list loc
 

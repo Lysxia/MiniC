@@ -94,10 +94,10 @@ let () =
     begin
       try
         Format.printf "File %s\n@?" Sys.argv.(i);
-        print_ast std_formatter (Parser.prog Lexer.token buf);
+        print_ast std_formatter (Parser.prog Lexer.token buf).desc;
       with
         | Error.E (sp,ep,s) -> Error.prerr Sys.argv.(i) sp ep s
-        | Parser.Error -> Error.catch Sys.argv.(i) buf
+        | Parser.Error -> Error.syntax Sys.argv.(i) buf
     end;
     close_in h;
     print_newline ()

@@ -5,10 +5,10 @@
 CMO=error.cmo lexer.cmo parser.cmo typing.cmo
 GENERATED=lexer.ml parser.ml parser.mli 
 PARSER_GEN=parser.automaton parser.conflicts
-BIN=main
+BIN=minic
 
 $(BIN):$(CMO) main.cmo
-	@ocamlc -o $(BIN) $(CMO) $(BIN).cmo
+	@ocamlc -o $(BIN) $(CMO) main.cmo
 
 
 .SUFFIXES: .mli .ml .cmi .cmo .mll .mly
@@ -31,10 +31,6 @@ $(BIN):$(CMO) main.cmo
 
 clean:
 	@rm -f *.cm[io] *.o *~ $(GENERATED) $(PARSER_GEN)
-
-#
-#TESTING
-#
 
 all: $(BIN) parser_test
 

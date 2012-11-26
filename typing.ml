@@ -341,10 +341,13 @@ let typevdeclist env vl =
   in
   uni env [] Sset.empty vl
 
-let typeglobalvdec env ({ desc=vt,vid ; loc=loc } as h) =
-  if Smap.mem vid env.v
+let typeglobalvdec env ({ desc=vt,id ; loc=loc } as h) =
+  if Smap.mem id env.v
     then error loc
-      ("previous declaration of \'"^vid^"\' was here")
+      ("redefinition of \'"^id^"\'")
+  else if Smap.mem id env.f
+    then error loc
+      ("\'"^id^"\' redeclared as different kind of symbol")
     else typevdec env h
   
 (*****)
@@ -380,13 +383,13 @@ and typei t0 env { desc=idesc ; loc=loc } =
       | Bloc (vl,il) -> let env,tvl = typevdeclist env vl in
           TBloc (tvl,List.map (typeinstr t0 env) il)
       | Return None ->
+          (*if t0=V then gcc accepts*) TReturn None
+      | Return (Some e) -> let e = typeexpr env e in
           if t0=V
-            then TReturn None
-            else raise (E
+            then raise (E
               ("\'return\' with a value, "^
               "in function returning void"))
-      | Return (Some e) -> let e = typeexpr env e in
-          if compatible e.t t0
+          else if compatible e.t t0
             then TReturn (Some e)
             else raise (E
               ("incompatible types when returning type \'"^
@@ -402,32 +405,54 @@ let type_instr = typeinstr V empty
 let typeconstr =
   let free = ref 0 in
   fun env (t,vl) ->
-  let members = Array.make (List.length vl) V in
+  let n = List.length vl in
+  let members = Array.make n V in
   let t,id = match t with
     | Struct id -> (S !free),id
     | Union id -> (U !free),id
     | _ -> assert false
   in
+  if Smap.mem id env.constr
+    then raise (E 
+      ("structure or union with the same name \'"^id^
+       "\' previously declared"));
   let env = { env with constr=Smap.add id t env.constr } in
-  let rec fill i mb = function
+  let rec fill i j s mb = function
     | [] -> mb
-    | { desc=vt,id ; loc=loc }::t -> try
+    | { desc=vt,id ; loc=loc }::tl -> try
       let vt=wft env vt in
       if compatible vt V
-        then raise (E ("variable or field \'"^id^"\' declared void"));
-      members.(i) <- vt;
-      fill (i+1) (Smap.add id (vt,i) mb) t
+        then raise (E ("variable or field \'"^id^"\' declared void"))
+      else if Sset.mem id s
+        then raise (E ("duplicate member \'"^id^"\'"))
+      else if vt = t
+        then raise (E ("Incomplete type \'"^id^"\'"))
+      else if vt = C
+        then begin
+          members.(j) <- vt;
+          fill i (j-1) (Sset.add id s) (Smap.add id (vt,j) mb) tl
+        end
+        else begin
+          members.(i) <- vt;
+          fill (i+1) j (Sset.add id s) (Smap.add id (vt,i) mb) tl
+        end
     with
        | E s -> error loc s
   in
   Hashtbl.add constr_of_tid !free id;
-  let env = { env with mb=Imap.add !free (fill 0 Smap.empty vl) env.mb } in
+  let env = { env with mb=Imap.add !free (fill 0 (n-1) Sset.empty Smap.empty vl) env.mb } in
   incr free;
   env, (t,members)
 
 let typefun =
   let free = ref 0 in
   fun env loc (t,id,arg,decl,instr) ->
+    if Smap.mem id env.f
+      then raise (E
+        ("redefinition of \'"^id^"\'"))
+    else if Smap.mem id env.v
+      then raise (E
+        ("\'"^id^"\' redeclared as different kind of symbol"));
     let t = wft env t in
     let env2,arg = typevdeclist env arg in
     let argt = List.map (fun (t,_) -> t) arg in
@@ -439,7 +464,7 @@ let typefun =
 (*****)
 
 (* Program typing *)
-let type_prog ast =
+let type_prog { desc=ast ; loc=loc } =
   let rec main_loc = function
     | Dec { desc=Fct (_,"main",_,_,_) ; loc=loc }::_ ->
       loc.start_p,loc.end_p
@@ -457,16 +482,17 @@ let type_prog ast =
           raise (Error.E (sp,ep,
           "function main has incorrect prototype"));
       with
-        | Not_found -> raise (Error.Global
-        "int main() or int main(int,char**) expected"))
+        | Not_found -> raise (Error.E (loc.end_p,loc.end_p,
+        "int main() or int main(int,char**) expected")))
     | (Ast.V vd)::t -> type_declist (typeglobalvdec env vd) cl fl t
-    | (Dec {desc=d;loc=loc})::t ->
+    | (Dec {desc=d;loc=loc})::t -> try
       match d with
         | Typ (ty,v) -> let env,c = typeconstr env (ty,v) in
             type_declist env (c::cl) fl t
         | Fct (rt,id,arg,d,i) ->
           let env,f = typefun env loc (rt,id,arg,d,i) in
             type_declist env cl (f::fl) t
+      with E s -> error loc s
   in
   type_declist { empty with
     f=Smap.add "putchar" (I,-1,[I])

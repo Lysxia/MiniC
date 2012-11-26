@@ -25,29 +25,39 @@ let compile file =
   try
     let ast = Parser.prog Lexer.token lexbuf in
     close_in h;
-    if !parse_only then exit 0;
-    let tast = Typing.type_prog ast in
-    0;
+    if !parse_only then 0
+    else begin
+      let tast = Typing.type_prog ast in
+      if !type_only then 0
+      else begin
+        0
+      end;
+    end;
   with
     | Error.E (sp,ep,s) -> close_in h; Error.prerr file sp ep s; 1
-    | Error.Global s -> close_in h; Error.prgerr file s; 1
-    | Parser.Error -> close_in h; Error.catch file lexbuf; 1
-    | _ -> close_in h; Printf.fprintf stdout "Unexpected error.\n%!"; 2
+    | Parser.Error -> close_in h; Error.syntax file lexbuf; 1
+    | _ -> close_in h; Printf.eprintf "(╯°^°）╯︵ ┻━┻ Unexpected error.\n%!"; 2
 
 
 let () =
   try 
     Arg.parse speclist collect usage;
     let rec main = function
-      | [] ->
-        Printf.fprintf stdout "No file to compile specified.\n%s\n%!" usage;
-        exit 2;
+      | [] -> if not !batch
+        then begin
+          Printf.fprintf stdout "No file to compile specified.\n%s\n%!" usage;
+          exit 2;
+        end
+        else exit 0;
+      | file::t when !batch ->
+          let exit = compile file in
+          Printf.printf "Exit %d from file \"%s\"\n%!"
+          exit (Filename.basename file);
+          main t
       | [file] -> exit (compile file)
-      | file::t -> if !batch
-        then begin ignore (compile file); main t end
-        else begin
+      | _ ->
           Printf.fprintf stdout "Too many arguments.\n%s\n%!" usage;
-          exit 2; end
+          exit 2;
     in main !args
   with
     | _ -> Printf.fprintf stdout "Unexpected error.\n%!"; exit 2
