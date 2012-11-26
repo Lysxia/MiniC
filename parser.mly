@@ -44,7 +44,7 @@
 %%
 prog:
   dec* EOF
-  { List.flatten $1 }
+  { { desc=List.flatten $1 ; loc=loc $startpos $endpos } }
 
 debugexpr:
   expr EOF {$1}
@@ -55,7 +55,7 @@ debuginstr:
 dec:
   | vdec_list	{ List.map (fun v -> V v) $1 }
   | s=tdec | s=fdec
-    { [Dec { desc=s ; loc=loc $startpos(s) $endpos(s) }] }
+    { let s,loc = s in [Dec { desc=s ; loc=loc }] }
 
 vdec_list:
   | ty separated_nonempty_list(COMMA,var) SEMICOLON
@@ -63,15 +63,18 @@ vdec_list:
 
 tdec:
   | STRUCT IDENT LBRC vdec_list* RBRC SEMICOLON
-    { Typ (Struct $2, List.flatten $4) }
+    { Typ (Struct $2, List.flatten $4),
+      loc $startpos($1) $endpos($2) }
   | UNION IDENT LBRC vdec_list* RBRC SEMICOLON
-    { Typ (Union $2, List.flatten $4) }
+    { Typ (Union $2, List.flatten $4),
+      loc $startpos($1) $endpos($2) }
 
 fdec:
   t=ty count=star_count f=IDENT
     LPAR args=separated_list(COMMA,arg) RPAR
     LBRC vslist=vdec_list* ilist=instr* RBRC
-    { Fct (mk_pointer t count,f,args,List.flatten vslist,ilist) }
+    { Fct (mk_pointer t count,f,args,List.flatten vslist,ilist),
+      loc $startpos(t) $endpos(f) }
 
 var:
   | star_count IDENT 	{ {desc=$1,$2 ; loc=loc $startpos $endpos} }
