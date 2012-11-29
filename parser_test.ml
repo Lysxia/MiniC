@@ -63,7 +63,7 @@ and print_idesc h =
       (print_separ_list print_expr) e1
       (fun h -> function None -> () | Some e -> print_expr h e) e2
       (print_separ_list print_expr) e3 print_i i
-  | Bloc (v,i) -> fprintf h "{@,%a%a}"
+  | Bloc (v,i) -> fprintf h "\b\b{@,%a%a}"
       (fun h -> List.iter (fun v -> fprintf h "%a;@ " print_vdec v;)) v
       (fun h -> List.iter (print_i h)) i
   | Return (Some e) -> fprintf h "return %a"
@@ -79,7 +79,7 @@ and print_ddesc h = function
   | Typ (t,vl) -> fprintf h "%s {@[@ %a@]}"
       (typestring t)
       (fun h -> List.iter (fun v -> fprintf h "%a;@ " print_vdec v;)) vl
-  | Fct (t,f,arg,v,i) -> fprintf h "%s %s(%a) @[<hv>%a@]"
+  | Fct (t,f,arg,v,i) -> fprintf h "%s %s(%a)@\n  @[<hv>%a@]"
       (typestring t) f
       (print_separ_list print_vdec) arg
       print_idesc (Bloc (v,i))

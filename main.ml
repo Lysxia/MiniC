@@ -1,6 +1,7 @@
 let parse_only = ref false
 let type_only = ref false
 let batch = ref false
+let output = ref true
 
 let usage = Printf.sprintf
   "Usage : %s program.c [-parse-only] [-type-only]"
@@ -11,6 +12,8 @@ let speclist = [
     "Exit after parsing";
   "-type-only",Arg.Unit (fun () -> type_only := true),
     "Exit after typing";
+  "-no-output",Arg.Unit (fun () -> output := false),
+    "Do not write compiled result";
   "-batch",Arg.Unit (fun () -> batch := true),
     "Compile multiple files (separately)"
   ]
@@ -52,7 +55,7 @@ let () =
       | file::t when !batch ->
           let exit = compile file in
           Printf.printf "Exit %d from file \"%s\"\n%!"
-          exit (Filename.basename file);
+          exit file;
           main t
       | [file] -> exit (compile file)
       | _ ->

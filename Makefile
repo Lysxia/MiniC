@@ -2,27 +2,25 @@
 # Li-yao Xia
 #
 
-CMO=error.cmo lexer.cmo parser.cmo typing.cmo
+CMX=error.cmx lexer.cmx parser.cmx typing.cmx
 GENERATED=lexer.ml parser.ml parser.mli 
 PARSER_GEN=parser.automaton parser.conflicts
 BIN=minic
 
-$(BIN):$(CMO) main.cmo
-	@ocamlc -o $(BIN) $(CMO) main.cmo
+$(BIN):$(CMX) main.ml
+	@ocamlopt -o $(BIN) $(CMX) main.ml
 
 
-.SUFFIXES: .mli .ml .cmi .cmo .mll .mly
+%.cmi: %.mli
+	@ocamlopt -c $<
 
-.mli.cmi:
-	@ocamlc -c $<
+%.cmx: %.ml
+	@ocamlopt -c $<
 
-.ml.cmo:
-	@ocamlc -c $<
-
-.mll.ml:
+%.ml : %.mll
 	@ocamllex $<
 
-.mly.ml:
+%.ml : %.mly
 	@menhir -v --infer $<
 
 .depend depend:$(GENERATED)
@@ -30,19 +28,21 @@ $(BIN):$(CMO) main.cmo
 	@ocamldep *.ml *.mli > .depend
 
 clean:
-	@rm -f *.cm[io] *.o *~ $(GENERATED) $(PARSER_GEN)
+	@rm -f *.cm[ix] *.o *~ $(GENERATED) $(PARSER_GEN)
 
-all: $(BIN) parser_test
 
-parser_test:$(CMO) parser_test.cmo
-	@ocamlc -o parser_test $(CMO) parser_test.ml
+parser_test:$(cmx) parser_test.cmx
+	@ocamlopt -o parser_test $(cmx) parser_test.ml
 
 parser.ml: ast.cmi
 
-typing.cmo: typing.cmi
+typing.cmx: typing.cmi
+
+test: $(BIN)
+	-@sh test.sh
 
 project:
-	@cp Makefile main.ml lexer.mll parser.mly ast.mli error.ml typing.ml typing.mli report/report_compiler.pdf parser_test.ml xia-liyao/
+	@cp Makefile main.ml lexer.mll parser.mly ast.mli error.ml typing.ml typing.mli report/report_compiler.pdf parser_test.ml test.sh xia-liyao/
 	@tar -zcf xia-liyao.tgz xia-liyao
 
 include .depend

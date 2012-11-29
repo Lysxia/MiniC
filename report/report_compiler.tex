@@ -36,6 +36,9 @@ d'erreurs (affichage des messages d'erreur)
   \item {\it main.ml}
 \end{itemize}
 
+(Il y a un fichier {\it parser\_test.ml} mais il ne fait pas partie du
+programme final)
+
 \section{Choix et difficultés}
 
 Je m'y suis pris assez tôt, donc j'avais globalement fini le
@@ -45,9 +48,10 @@ des simplifications et factoriser du code par des méthodes reprises du
 cours. 
 
 Un aspect de mon travail qui aurait pu me faire perdre beaucoup de temps est que 
-j'ai écrit de grandes parties de mon programme sans prendre le temps de
-vérifier leur correction. Des tests ont été faits seulement une fois le
-parseur terminé (affichage de l'AST, fichier absent de l'archive), puis 
+j'ai écrit de grandes parties de mon programme d'un seul trait
+sans prendre le temps de vérifier leur correction.
+Des tests ont été faits seulement une fois le
+parseur terminé (affichage de l'AST), puis 
 après que le typeur soit entièrement écrit.
 Seules les erreurs de syntaxe étaient corrigées
 pendant la majorité de la rédaction du projet. 
@@ -77,13 +81,14 @@ tête :
 parsing afin d'avoir un cas de moins à traiter dans la suite. Le code qui
 résultait de cette "amélioration" n'était pas agréable du tout, j'ai
 finalement abandonné cette idée.
-  \item simplifier mon AST, d'où une certaine assymétrie à certains
+  \item simplifier mon AST ; d'où une certaine assymétrie à certains
 niveaux par rapport à la grammaire fournie dans le sujet : je ne localise
-pas les instructions du type {\bf expression;} ou les déclarations de
+pas les instructions du type {\bf expression;} ou les listes de déclarations de
 variables car ceci est déjà fait à un niveau plus bas dans l'arbre.
   \item à la sortie du typage, convertir les identifieurs en entiers
 afin de diminuer les temps de recherche. Sur les machines modernes cette
-conversion est plutôt accessoire mais j'ai tenu à le faire. 
+conversion est accessoire. Un dictionnaire serait d'efficacité
+comparable tout en conservant l'information des noms de fonctions.
 \end{itemize}
 
 En contraste avec ces maniaqueries, j'ai reporté le traitement de
