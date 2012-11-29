@@ -15,10 +15,6 @@ module Imap = Map.Make(
     let compare=compare
   end)
  
-module Smap = Map.Make(String)
-
-module Sset = Set.Make(String)
- 
 type tident = int
 
 (* P (n,t) when n>0 which is the case for any AST built

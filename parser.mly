@@ -33,6 +33,8 @@
 %left STAR DIV MOD
 %right INCR DECR Unop
 %left ARROW DOT LBKT
+%left RPAR
+%left ELSE
 
 
 %start debugexpr debuginstr prog
