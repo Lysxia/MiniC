@@ -214,7 +214,7 @@ int main()
 	//      ");
     #endif
     #if TEST==29
-      return m();
+      printf("a%da\n",m());
     #endif
     return 0;
 }

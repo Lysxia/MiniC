@@ -1,4 +1,4 @@
-(** Mini-C typing **)
+(** Mini-C compiler **)
 (* Li-yao Xia *)
 
 (* I refer to gcc whenever the paper is not precise enough
@@ -62,7 +62,7 @@ type tconstr = tt*tt array
 type tfct = tt*tident*tvdec list*tinstr (* a block *)
 
 type tfile =
-  tconstr list*tfct list*tvdec list
+  tconstr list*tfct list*tvdec list*string array
 (*****)
 
 (* Identifiers are converted to numbers,
@@ -73,6 +73,7 @@ type env = {
   constr : tt Smap.t; (* defined structure/union types *)
   mb : (tt*tident) Smap.t Imap.t ; (* s/u members *)
   v : (tt*tident) Smap.t ; (* variables *)
+  vnames : (int,string) Hashtbl.t ; (* variable names *)
   free : int ;
   }
 
@@ -81,6 +82,7 @@ let empty = {
   constr=Smap.empty;
   mb=Imap.empty;
   v=Smap.empty;
+  vnames=Hashtbl.create 17;
   free=0;}
 
 let globals = ref empty
@@ -344,7 +346,10 @@ let typeglobalvdec env ({ desc=vt,id ; loc=loc } as h) =
   else if Smap.mem id env.f
     then error loc
       ("\'"^id^"\' redeclared as different kind of symbol")
-    else typevdec env h
+    else begin
+      Hashtbl.add env.vnames env.free id;
+      typevdec env h
+    end
   
 (*****)
 
@@ -473,7 +478,10 @@ let type_prog { desc=ast ; loc=loc } =
           | I,_,[] | I,_,[I;P(2,C)] -> 
             let vl =
               Smap.fold (fun _ d vl -> d::vl) env.v []
-            in cl,fl,vl
+            in
+            let names = Array.make (Hashtbl.length env.vnames) "" in
+            Hashtbl.iter (fun i s -> names.(i)<-s) env.vnames;
+            cl,fl,vl,names
           | _ -> let sp,ep = main_loc ast in
           raise (Error.E (sp,ep,
           "function main has incorrect prototype"));

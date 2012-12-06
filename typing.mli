@@ -1,4 +1,4 @@
-(** Mini-C typing **)
+(** Mini-C compiler **)
 (* Typed trees *)
 
 exception E of string
@@ -50,7 +50,7 @@ type tconstr = tt*tt array
 
 type tfct = tt*tident*tvdec list*tinstr
 
-type tfile = tconstr list*tfct list*tvdec list
+type tfile = tconstr list*tfct list*tvdec list*string array
 
 
 val type_expr  : Ast.expr  -> texpr

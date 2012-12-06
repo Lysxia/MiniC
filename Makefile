@@ -3,7 +3,7 @@
 #
 ## Append > /dev/zero to shut them up
 
-DEP=error.ml ast.mli parser.mly lexer.mll smap.mli smap.ml typing.ml mipsofast.ml
+DEP=error.ml ast.mli parser.mly lexer.mll smap.ml typing.ml
 PARSER_GEN=parser.automaton parser.conflicts
 BIN=minic
 
@@ -22,6 +22,6 @@ test: $(BIN)
 	@sh test.sh
 
 project:
-	@cp Makefile main.ml lexer.mll parser.mly ast.mli error.ml smap.ml smap.mli typing.ml typing.mli report/report_compiler.pdf parser_test.ml test.sh mipsofast.ml xia-liyao/
+	@cp Makefile main.ml lexer.mll parser.mly ast.mli error.ml smap.ml sset.ml typing.ml typing.mli mipsofast.ml report/report_compiler.pdf parser_test.ml test.sh xia-liyao/
 	@tar -zcf xia-liyao.tgz xia-liyao
 

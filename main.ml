@@ -1,3 +1,6 @@
+(** Mini-C Compiler **)
+(* Li-yao Xia *)
+
 let parse_only = ref false
 let type_only = ref false
 let batch = ref false
@@ -63,4 +66,4 @@ let () =
           exit 2;
     in main !args
   with
-    | _ -> Printf.fprintf stdout "Unexpected error.\n%!"; exit 2
+    | _ -> Printf.fprintf stdout "(╯°^°）╯︵ ┻━┻ Unexpected error.\n%!"; exit 2
