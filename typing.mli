@@ -6,6 +6,7 @@ exception E of string
 module Imap : Map.S with type key=int
 
 type tident = int
+type tname = string
 
 type tt =
   | V | I | C
@@ -26,16 +27,17 @@ type texpr = tedesc typed
 and tedesc =
   | TCi     of Int32.t
   | TCs     of string
-  | TId     of tident
+  | TLoc    of tident
+  | TGlo    of tname
   | TDot    of texpr*tident
   | TAssign of texpr*texpr
-  | TCall   of tident*texpr list
+  | TCall   of tname*texpr list
   | TUnop   of tunop*texpr
   | TBinop  of tbinop*texpr*texpr
   | TSizeof of tt
 
 
-type tvdec = tt*tident
+type tvdec = tt*tname
 
 type tinstr =
   | TNop
@@ -43,16 +45,23 @@ type tinstr =
   | TIf     of texpr*tinstr*tinstr
   | TWhile  of texpr*tinstr
   | TFor    of texpr list*texpr*texpr list*tinstr
-  | TBloc   of tvdec list*tinstr list
+  | TBloc   of tinstr list
   | TReturn of texpr option
 
 type tconstr = tt*tt array
 
-type tfct = tt*tident*tvdec list*tinstr
+type tfct = {
+  tret    : tt;
+  tfid    : tname;
+  formals : int;
+  locals  : tt array;
+  tbody   : tinstr list;
+  }
 
-type tfile = tconstr list*tfct list*tvdec list*string array
+type tfile = tconstr list*tfct list*tvdec list
 
+type env
 
 val type_expr  : Ast.expr  -> texpr
-val type_instr : Ast.instr -> tinstr
+val type_instr : Ast.instr -> tinstr*env
 val type_prog  : Ast.file  -> tfile

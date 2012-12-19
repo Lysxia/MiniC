@@ -2,7 +2,7 @@
  *  call gcc -c 'this_file.c'
  */
 
-#define TEST 29
+#define TEST 31
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -194,6 +194,15 @@ int m()
 }
 #endif
 
+#if TEST==31
+int m(int a)
+{
+    {
+    int a;
+    }
+}
+#endif
+
 int main()
 {
     #if TEST==14
@@ -216,5 +225,8 @@ int main()
     #if TEST==29
       printf("a%da\n",m());
     #endif
+#if TEST==30
+      printf("%d",(int) (1/0));
+#endif
     return 0;
 }

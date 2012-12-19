@@ -3,68 +3,142 @@
 
 open Typing
 
+module Iset = Set.Make(struct type t=int let compare=compare end)
+
 type munop = Neg
-  | Addi of Int32.t | Divi of Int32.t | Muli of Int32.i
-  | Subi of Int32.t | Remi of Int32.t
+  | Addi of Int32.t | Divi of Int32.t | Muli of Int32.t
+  | Subi of Int32.t | Remi of Int32.t
 
 type mbinop =
   | Add | Div | Mul | Sub | Rem | Seq
 
 type expr =
-  | Econst of Int32.t
-  | Emunop of munop*expr
-  | Embinop of mbinop*expr*expr
-  | Eand of expr*expr
-  | Eor of expr*expr
+  | Mconst  of Int32.t (* li *)
+  | Mmove   of expr*expr (* first must be a lvalue *)
+  | Munop  of munop*expr
+  | Mbinop of mbinop*expr*expr
+  | Mlvar   of tident (* lw or use registers *)
+  | Mgvar   of string (* la *)
+  | Mlw     of expr*int (*16*)
+  | Msw     of expr*int (*16*)
+  | Mand    of expr*expr
+  | Mor     of expr*expr
+  | Mzero   of expr (* e*0 -> e; 0; if e is not "pure" *)
+  | Mcall   of string*expr list
 
 (********************************)
 
-let int16 n = -32767<n && n<32768
+let int16 n =
+  0 > Int32.compare (Int32.of_int (-32767)) n
+  && 0 > Int32.compare (Int32.of_int 32768) n
+
+let tsize = Hashtbl.create 17
 
 let sizeof = function
-  | _ -> assert false
+  | I -> 4
+  | C -> 1
+  | P _ -> 4
+  | S i | U i -> Hashtbl.find tsize i
+  | _ -> assert false
 
 let rec mk_add e1 e2 = match e1,e2 with
-  | Econst m, Econst n ->
-      Econst (Int32.add m n)
-  | e, Econst Int32.zero
-  | Econst Int32.zero, e -> e
-  | Emunop (Addi m, e), Econst n
-  | Econst n, Emunop (Addi m, e) ->
+  | Mconst m, Mconst n ->
+      Mconst (Int32.add m n)
+  | e, Mconst n
+  | Mconst n, e when n = Int32.zero -> e
+  | Mmunop (Addi m, e), Mconst n
+  | Mconst n, Mmunop (Addi m, e) ->
       mk_add (Econst (Int32.add m n)) e
-  | Emunop (Subi m, e), Econst n
-  | Econst n, Emunop (Subi m, e) ->
+  | Munop (Addi m, e1), e2
+  | e2, Munop (Addi m, e1) ->
+      mk_add (Mconst m) (mk_add e1 e2)
+  | Munop (Subi m, e), Mconst n
+  | Mconst n, Munop (Subi m, e) ->
       mk_add (Econst (Int32.sub n m)) e
-  | e1, Emunop (Neg, e2)
-  | Emunop (Neg, e2), Econst e1 ->
+  | Munop (Subi m, e1), e2
+  | e2, Munop (Subi m, e1) ->
+      mk_sub (mk_add e1 e2) (Mconst m)
+  | e1, Munop (Neg, e2)
+  | Munop (Neg, e2), e1 ->
       mk_sub e1 e2 (* The evaluation order of binop is not specified *)
-  | e,Econst n | Econst n,e when int16 n ->
-      Emunop (Addi n, e)
-  | _ -> Embinop (Add, e1, e2)
+  | e,Mconst n | Mconst n,e ->
+      Munop (Addi n, e)
+  | _ -> Mbinop (Add, e1, e2)
 
 and mk_sub e1 e2 = match e1,e2 with
-  | Econst m, Econst n ->
-      Econst (Int32.sub m n)
-  | e, Econst Int32.zero -> e
-  | Econst Int32.zero, e ->
+  | Mconst m, Mconst n ->
+      Mconst (Int32.sub m n)
+  | e, Mconst n when n=Int32.zero -> e
+  | Mconst n, e when n=Int32.zero ->
       mk_neg e
-  | e1,Emunop (Neg, e2) ->
+  | e1,Munop (Neg, e2) ->
       mk_add e1 e2
-  | e, Econst n when int16 n ->
-     Emunop (Subi n, e)
-  | Econst n, e when int16 n ->
-     Emunop (Neg, (Emunop (Subi n, e)))
-  | _ -> Embinop (Sub, e1, e2)
-  
+  | e, Mconst n when int16 n ->
+     Munop (Subi n, e)
+  | Mconst n, e when int16 n ->
+     Munop (Neg, (Munop (Subi n, e)))
+  | _ -> Mbinop (Sub, e1, e2)
+
 and mk_neg = function
-  | Econst n -> Econst (Int32.neg n)
-  | Emunop (Neg, e) -> e
-  | Ebinop (Sub, e1, e2) -> mk_sub e2 e1
-  | e -> Emunop (Neg, e)
+  | Mconst n -> Mconst (Int32.neg n)
+  | Munop (Neg, e) -> e
+  | Mbinop (Sub, e1, e2) -> mk_sub e2 e1
+  | Munop (Muli n, e) ->
+      Munop (Muli (Int32.neg n), e)
+  | Munop (Divi n, e) ->
+      Munop (Divi (Int32.neg n), e)
+  | e -> Munop (Neg, e)
+
+let rec pure e = match e with
+  | Mconst _ | Mlvar _ | Mgvar _ -> true
+  | Munop (_,e) | Mlw (e,_) | Msw (e,_) | Mzero e -> pure e
+  | Mmove (_,_) | Mcall _ -> false
+     (* functions can be examined for pureness *)
+  | Mbinop (_,e1,e2) | Mand (e1,e2) | Mor (e1,e2) ->
+      pure e1 && pure e2
 
 let rec mk_mul e1 e2 = match e1,e2 with
-  | _ -> assert false
+  | Mconst n, Mconst m -> Mconst (Int32.mul n m)
+  | Mconst n, Munop (Muli m, e)
+  | Munop (Muli m, e), Mconst n ->
+      mk_mul (Mconst (Int32.mul m n)) e
+  | Mconst n, e | e, Mconst n when n=Int32.zero ->
+      if pure e
+        then Mconst Int32.zero
+        else Mzero e
+  | Mconst n, e | e, Mconst n ->
+     Munop (Muli n, e)
+  | e1, e2 -> Mbinop (Mul, e1, e2)
+ (* use shifts when mul a power of 2 *)
+ (* e*0 -> check pure e*)
 
 and mk_div e1 e2 = match e1,e2 with
-  | _ -> assert false
+  | Mconst n, Mconst m -> Mconst (Int32.div n m)
+  | e, Mconst n ->
+      if n = Int32.zero
+        then Printf.printf "Warning : Divide by zero";
+      Munop (Divi Int32.zero, e)
+  | e1,e2 -> Mbinop (Div, e1, e2)
+ (* use shifts when div a power of 2 *)
+ (* e/0 -> ??*)
 
+and mk_rem e1 e2 = match e1,e2 with
+  | Mconst n, Mconst m -> Mconst (Int32.rem n m)
+  | e, Mconst n -> Munop (Remi n, e)
+  | e1,e2 -> Mbinop (Rem, e1, e2)
+  (* use masks when mod a power of 2 (?) *)
+
+let mk_assign e1 e2 = assert false
+
+let select_expr env genv {tdesc=e ; t=tt} = match e with
+  | TCi n -> Mconst n
+  | TCs s -> assert false (* Not implemented *)
+  | TId i ->
+      if Iset.find i env
+        then Mlvar i
+        else Mgvar genv.(i) (* Should probably correct typing *)
+  | TDot (e,i) -> assert false (* Not implemented *)
+  | TAssign (e1,e2) ->
+    mk_assign (select_expr env genv e1) (select_expr env genv e2)
+  | TCall (f,l) -> Mcall (f,List.map (select_expr env genv) l)
+  | 

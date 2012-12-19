@@ -56,6 +56,13 @@ and idesc =
   | Bloc   of vdec list*instr list
   | Return of expr option
 
+type fct = {
+  ret:t;
+  fid:ident;
+  arg:vdec list;
+  locv:vdec list;
+  body:instr list;
+  }
 
 type dec = 
   | Dec of ddesc loc
@@ -63,7 +70,7 @@ type dec =
 
 and ddesc =
   | Typ of t*vdec list
-  | Fct of t*ident*vdec list*vdec list*instr list
+  | Fct of fct
 
 type file = dec list loc
 

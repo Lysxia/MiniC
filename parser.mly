@@ -75,7 +75,12 @@ fdec:
   t=ty count=star_count f=IDENT
     LPAR args=separated_list(COMMA,arg) RPAR
     LBRC vslist=vdec_list* ilist=instr* RBRC
-    { Fct (mk_pointer t count,f,args,List.flatten vslist,ilist),
+    { Fct {
+        ret=mk_pointer t count;
+        fid=f;
+        arg=args;
+        locv=List.flatten vslist;
+        body=ilist},
       loc $startpos(t) $endpos(f) }
 
 var:
