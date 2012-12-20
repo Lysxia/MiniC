@@ -506,11 +506,11 @@ let typefun env loc {ret=t;fid=id;arg=arg;locv=decl;body=instr} =
       (fun {desc=_,x;loc=loc} ->
         if Smap.mem x env.lcl
           then error loc ("redefinition of \'"^x^"\'")) decl;
-    let il,env = typeilist t (typevdeclist env decl) [] instr in
+    let il,env1 = typeilist t (typevdeclist env decl) [] instr in
     { tret   = t;
       tfid   = id;
       formals= env.free;
-      locals = Array.of_list (List.rev env.lclacc);
+      locals = Array.of_list (List.rev env1.lclacc);
       tbody  = il
       },env
   with E s -> error loc s

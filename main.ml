@@ -1,24 +1,29 @@
 (** Mini-C Compiler **)
 (* Li-yao Xia *)
 
+open Ast_printer
+
 let parse_only = ref false
 let type_only = ref false
 let batch = ref false
 let output = ref true
+let print_tast = ref false
 
 let usage = Printf.sprintf
   "Usage : %s program.c [-parse-only] [-type-only]"
   (Filename.basename Sys.argv.(0))
 
 let speclist = [
-  "-parse-only",Arg.Unit (fun () -> parse_only := true),
+  "-parse-only",Arg.Set parse_only,
     "Exit after parsing";
-  "-type-only",Arg.Unit (fun () -> type_only := true),
+  "-type-only",Arg.Set type_only,
     "Exit after typing";
-  "-no-output",Arg.Unit (fun () -> output := false),
+  "-no-output",Arg.Clear output,
     "Do not write compiled result";
-  "-batch",Arg.Unit (fun () -> batch := true),
-    "Compile multiple files (separately)"
+  "-batch",Arg.Set batch,
+    "Compile multiple files (separately)";
+  "-pt", Arg.Set print_tast,
+    "Print typed AST ; implies -type-only"
   ]
 
 let args = ref []
@@ -34,7 +39,12 @@ let compile file =
     if !parse_only then 0
     else begin
       let tast = Typing.type_prog ast in
-      if !type_only then 0
+      if !print_tast
+        then begin
+          print_tfile Format.std_formatter tast;
+          0
+        end
+      else if !type_only then 0
       else begin
         0
       end;
