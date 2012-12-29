@@ -129,22 +129,26 @@ and mk_rem e1 e2 = match e1,e2 with
 
 let mk_assign e1 e2 = assert false
 
-let mk_string =
-  let free = ref 0 in
-  fun s -> incr free;
-    Hashtbl.add data ("string"^string_of_int !free);
-    Mla ("_string"^string_of_int !free)
+let mk_string s = assert false
 
-let select_expr env genv {tdesc=e ; t=tt} = match e with
+let mk_unop u = assert false
+
+let mk_binop o = assert false
+
+let isexpr {tdesc=e ; t=tt} = match e with
   | TCi n -> Mconst n
-  | TCs s -> mk_string s
-  | TId i ->
-      if Iset.find i env
-        then Mlvar i
-        else Mgvar genv.(i) (* Should probably correct typing *)
+  | TCs s -> assert false
+  | TLoc i -> Mlvar i
+  | TGlo x -> Mgvar x
   | TDot (e,i) -> assert false (* Not implemented *)
   | TAssign (e1,e2) ->
-    mk_assign (select_expr env genv e1) (select_expr env genv e2)
-  | TCall (f,l) -> Mcall (f,List.map (select_expr env genv) l)
-  | 
+    mk_assign (isexpr env genv e1) (isexpr env genv e2)
+  | TCall (f,l) -> Mcall (f,List.map (isexpr env genv) l)
+  | TUnop (u,e) -> mk_unop u (isexpr e)
+  | TBinop (o,e1,e2) -> mk_binop o (isexpr e1) (isexpr e2)
+  | TSizeof t -> sizeof t
 
+let isinstr = function
+  | TNop 
+
+let isconstr (t,fields) = assert false
