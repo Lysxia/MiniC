@@ -19,7 +19,7 @@ clean:
 parser_test: $(DEP) parser_test.ml
 	@ocamlbuild -quiet parser_test.native
 
-test: $(BIN)
+test: $(BIN) tests/
 	@sh test.sh
 
 project:
