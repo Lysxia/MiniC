@@ -19,6 +19,7 @@ type expr =
   | Mbinop of mbinop*expr*expr
   | Mlvar   of tident (* lw or use registers *)
   | Mgvar   of string (* la *)
+  | Mla     of string
   | Mlw     of expr*int (*16*)
   | Msw     of expr*int (*16*)
   | Mand    of expr*expr
@@ -28,11 +29,9 @@ type expr =
 
 (********************************)
 
-let int16 n =
-  0 > Int32.compare (Int32.of_int (-32767)) n
-  && 0 > Int32.compare (Int32.of_int 32768) n
-
 let tsize = Hashtbl.create 17
+
+let data = Hashtbl.create 5
 
 let sizeof = function
   | I -> 4
@@ -130,9 +129,15 @@ and mk_rem e1 e2 = match e1,e2 with
 
 let mk_assign e1 e2 = assert false
 
+let mk_string =
+  let free = ref 0 in
+  fun s -> incr free;
+    Hashtbl.add data ("string"^string_of_int !free);
+    Mla ("_string"^string_of_int !free)
+
 let select_expr env genv {tdesc=e ; t=tt} = match e with
   | TCi n -> Mconst n
-  | TCs s -> assert false (* Not implemented *)
+  | TCs s -> mk_string s
   | TId i ->
       if Iset.find i env
         then Mlvar i
@@ -142,3 +147,4 @@ let select_expr env genv {tdesc=e ; t=tt} = match e with
     mk_assign (select_expr env genv e1) (select_expr env genv e2)
   | TCall (f,l) -> Mcall (f,List.map (select_expr env genv) l)
   | 
+
