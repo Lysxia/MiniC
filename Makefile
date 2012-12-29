@@ -3,7 +3,8 @@
 #
 ## Append > /dev/zero to shut them up
 
-DEP=error.ml ast.mli parser.mly lexer.mll smap.ml typing.ml
+DEP=error.ml ast.mli parser.mly lexer.mll smap.ml \
+    typing.ml typing.mli ast_printer.ml
 PARSER_GEN=parser.automaton parser.conflicts
 BIN=minic
 
@@ -18,7 +19,7 @@ clean:
 parser_test: $(DEP) parser_test.ml
 	@ocamlbuild -quiet parser_test.native
 
-test: $(BIN)
+test: $(BIN) tests/
 	@sh test.sh
 
 project:
