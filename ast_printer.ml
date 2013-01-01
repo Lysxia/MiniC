@@ -67,7 +67,7 @@ let print_arg h n l =
     end
 
 let print_locals h n l =
-  for i = n+1 to Array.length l -1 do
+  for i = n to Array.length l -1 do
     Format.fprintf h "%s %d;@\n" (string_of_tt l.(i)) i
   done
 

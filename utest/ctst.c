@@ -2,7 +2,7 @@
  *  call gcc -c 'this_file.c'
  */
 
-#define TEST 31
+#define TEST 30
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -227,6 +227,11 @@ int main()
     #endif
 #if TEST==30
       printf("%d",(int) (1/0));
+#endif
+#if TEST==32
+      char a=255;
+      int c= 256;
+      printf("%d\n",c+a);
 #endif
     return 0;
 }

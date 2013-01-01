@@ -388,8 +388,7 @@ and typei t0 env { desc=idesc ; loc=loc } =
           if num e.t
             then begin
               let i1,env1 = typeinstr t0 env i1 in
-              let i2,env2 =
-                typeinstr t0 env1 i2 in
+              let i2,env2 = typeinstr t0 env1 i2 in
               TIf (e,i1,i2),env2
             end
             else raise (E ("used \'"^(stringtype e.t)^

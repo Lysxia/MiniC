@@ -1,13 +1,18 @@
 (** Mini-C Compiler **)
 (* Li-yao Xia *)
 
-open Ast_printer
+exception Interrupt of int
+
+let interrupt n = raise (Interrupt n)
+
+let fstdout = Format.std_formatter
 
 let parse_only = ref false
 let type_only = ref false
 let batch = ref false
 let output = ref true
 let print_tast = ref false
+let is = ref false
 
 let usage = Printf.sprintf
   "Usage : %s program.c [-parse-only] [-type-only]"
@@ -22,8 +27,10 @@ let speclist = [
     "Do not write compiled result";
   "-batch",Arg.Set batch,
     "Compile multiple files (separately)";
-  "-pt", Arg.Set print_tast,
-    "Print typed AST ; implies -type-only"
+  "-print-ast", Arg.Set print_tast,
+    "Print typed AST ; implies -type-only";
+  "-select-i", Arg.Set is,
+    "Print tree after instruction selection";
   ]
 
 let args = ref []
@@ -36,22 +43,25 @@ let compile file =
   try
     let ast = Parser.prog Lexer.token lexbuf in
     close_in h;
-    if !parse_only then 0
-    else begin
-      let tast = Typing.type_prog ast in
-      if !print_tast
-        then begin
-          print_tfile Format.std_formatter tast;
-          0
-        end
-      else if !type_only then 0
-      else begin
-        0
+    if !parse_only then interrupt 0;
+    let tast = Typing.type_prog ast in
+    if !print_tast
+      then begin
+        Ast_printer.print_tfile fstdout tast;
+        interrupt 0
       end;
-    end;
+    if !type_only then interrupt 0;
+    let ist = Iselect.file tast in
+      if !is
+        then begin
+          Iselect.print_file fstdout ist;
+          interrupt 0;
+        end;
+    0
   with
     | Error.E (sp,ep,s) -> close_in h; Error.prerr file sp ep s; 1
     | Parser.Error -> close_in h; Error.syntax file lexbuf; 1
+    | Interrupt n -> n
     | _ -> close_in h; Printf.eprintf "(╯°^°）╯︵ ┻━┻ Unexpected error.\n%!"; 2
 
 

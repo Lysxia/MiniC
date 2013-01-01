@@ -10,3 +10,9 @@
 10/30
 - see utest/ctst.c for syntax details
 
+01/01
+- Arguments :
+-- int, char, t* first in a0-a3 then stacked
+-- struct and unions always stacked
+- char c=255; c+1; second instruction will be defined behavior only mod 256
+- int a; &a; how to manage the address of a when a is allocated on a register ? create another variable...

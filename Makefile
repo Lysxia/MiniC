@@ -4,13 +4,13 @@
 ## Append > /dev/zero to shut them up
 
 DEP=error.ml ast.mli parser.mly lexer.mll smap.ml \
-    typing.ml typing.mli ast_printer.ml
+    typing.ml typing.mli ast_printer.ml iselect.ml
 PARSER_GEN=parser.automaton parser.conflicts
 BIN=minic
 
 $(BIN):$(DEP) main.ml
 	@ocamlbuild -quiet -use-menhir main.native
-	@mv main.native minic
+	@mv main.native $(BIN)
 
 clean:
 	@ocamlbuild -clean > /dev/zero
