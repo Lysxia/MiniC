@@ -54,7 +54,7 @@ let compile file =
     let ist = Iselect.file tast in
       if !is
         then begin
-          Iselect.print_file fstdout ist;
+          Print_ist.print_file fstdout ist;
           interrupt 0;
         end;
     0
