@@ -280,8 +280,6 @@ and mk_div e1 e2 = match e1,e2 with
   | Mconst n, Mconst m when m<>Int32.zero ->
       Mconst (Int32.div n m)
   | e1,e2 -> Mbinop (Div, e1, e2)
- (* use shifts when div a power of 2 *)
- (* e/0 -> ??*)
 
 and mk_rem e1 e2 = match e1,e2 with
   | e1,(Mconst n as e2) when n=Int32.zero ->
@@ -290,7 +288,6 @@ and mk_rem e1 e2 = match e1,e2 with
   | Mconst n, Mconst m when m<>Int32.zero ->
       Mconst (Int32.rem n m)
   | e1,e2 -> Mbinop (Rem, e1, e2)
-  (* use masks when mod a power of 2 (?) *)
 
 let rec mk_seq e1 e2 = match e1,e2 with
   | Mconst n,Mconst m ->

@@ -27,9 +27,9 @@ let speclist = [
     "Do not write compiled result";
   "-batch",Arg.Set batch,
     "Compile multiple files (separately)";
-  "-print-ast", Arg.Set print_tast,
+  "-ttree", Arg.Set print_tast,
     "Print typed AST ; implies -type-only";
-  "-select-i", Arg.Set is,
+  "-istree", Arg.Set is,
     "Print tree after instruction selection";
   ]
 
