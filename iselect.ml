@@ -91,14 +91,16 @@ and mk_sub e1 e2 = match e1,e2 with
   | Mconst m, Mconst n ->
       Mconst (Int32.sub m n)
   | e, Mconst n when n=Int32.zero -> e
-  | Mconst n, e when n=Int32.zero ->
-      mk_neg e
-  | e1,Munop (Neg, e2) ->
-      mk_add e1 e2
-  | e, Mconst n ->
-     Munop (Subi n, e)
-  | Mconst n, e ->
-     Munop (Neg, (Munop (Subi n, e)))
+  | Mconst n, e when n=Int32.zero -> mk_neg e
+  | Munop (Subi m, e), Mconst n -> mk_sub e (Mconst (Int32.add m n))
+  | Mconst m, Munop (Addi n, e) -> mk_sub (Mconst (Int32.sub m n)) e
+  | Munop (Addi m, e1), e2
+  | e1, Munop (Subi m, e2) -> mk_add (mk_sub e1 e2) (Mconst m)
+  | e1, Munop (Addi m, e2)
+  | Munop (Subi m, e1), e2 -> mk_sub (mk_sub e1 e2) (Mconst m)
+  | e1,Munop (Neg, e2) -> mk_add e1 e2
+  | e, Mconst n -> Munop (Subi n, e)
+  | Mconst n, e -> mk_neg (Munop (Subi n, e))
   | _ -> Mbinop (Sub, e1, e2)
 
 and mk_neg = function

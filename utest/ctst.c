@@ -2,7 +2,9 @@
  *  call gcc -c 'this_file.c'
  */
 
-#define TEST 33
+#define TEST 34
+
+#define MIN_INT 0x80000000
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -235,6 +237,9 @@ int main()
 #endif
 #if TEST==33
       printf("%d\n",(0x80000000)/(-1));
+#endif
+#if TEST==34
+      printf("%d\n",-MIN_INT);
 #endif
     return 0;
 }
