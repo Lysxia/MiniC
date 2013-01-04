@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define TEST 43
+#define TEST 45
 
 #define MIN_INT 0x80000000
 #define MAX_INT 0x7fffffff
@@ -300,6 +300,17 @@ int main()
 #endif
 #if TEST==43
       printf("%c\n","a"[0]);
+#endif
+#if TEST==44
+      int c[2]={1,2};
+      int k=0;
+      c[k]=c[++k];
+      print(c[0]);
+#endif
+#if TEST==45
+      print(((char) 128)*((char) 128));
+      print(((char) 128)+(char) 129);
+      print((char) 256);
 #endif
     return 0;
 }

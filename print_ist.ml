@@ -1,25 +1,31 @@
 open Iselect
+open Int32
 
-let rec print_unop h = function
-  | Neg -> Format.fprintf h "neg"
+let rec unop_string = function
+  | Neg -> "neg"
+  | Move i -> Format.sprintf "%d=" i
+  | Andi n ->
+      Format.sprintf "andi(%s)" (to_string n)
   | Addi n ->
-      Format.fprintf h "addi %s" (Int32.to_string n)
+      Format.sprintf "addi(%s)" (to_string n)
   | Subi n ->
-      Format.fprintf h "subi %s" (Int32.to_string n)
+      Format.sprintf "subi(%s)" (to_string n)
   | Muli n ->
-      Format.fprintf h "muli %s" (Int32.to_string n)
+      Format.sprintf "muli(%s)" (to_string n)
   | Divi n ->
-      Format.fprintf h "div(i) %s" (Int32.to_string n)
+      Format.sprintf "div_i(%s)" (to_string n)
   | Remi n ->
-      Format.fprintf h "rem(i) %s" (Int32.to_string n)
+      Format.sprintf "rem_i(%s)" (to_string n)
   | Slti n ->
-      Format.fprintf h "slti %s" (Int32.to_string n)
-  | Sltiu n ->
-      Format.fprintf h "sltiu %s" (Int32.to_string n)
+      Format.sprintf "slti(%s)" (to_string n)
+  | Seqi n ->
+      Format.sprintf "seqi(%s)" (to_string n)
+  | Snei n ->
+      Format.sprintf "snei(%s)" (to_string n)
   | Sll k ->
-      Format.fprintf h "sll %d" k
+      Format.sprintf "sll(%d)" k
 
-let rec string_binop = function
+let rec binop_string = function
   | Add -> "add"
   | Div -> "div"
   | Mul -> "mul"
@@ -27,20 +33,18 @@ let rec string_binop = function
   | Rem -> "rem"
   | Slt -> "slt"
   | Sle -> "sle"
-  | Sltu -> "sltu"
+  | Seq -> "seq"
+  | Sne -> "Sne"
 
 
 let rec print_expr h = function
-  | Mconst n -> Format.fprintf h "%s" (Int32.to_string n)
-  | Mmove (e1,e2) ->
-      Format.fprintf h "(%a=%a)"
-        print_expr e1 print_expr e2
+  | Mconst n -> Format.fprintf h "%s" (to_string n)
   | Munop (u,e) ->
-      Format.fprintf h "(%a %a)"
-        print_unop u print_expr e
+      Format.fprintf h "(%s %a)"
+        (unop_string u) print_expr e
   | Mbinop (o,e1,e2) ->
       Format.fprintf h "(%s %a %a)"
-        (string_binop o)
+        (binop_string o)
         print_expr e1
         print_expr e2
   | Mloc i ->
@@ -51,31 +55,31 @@ let rec print_expr h = function
       Format.fprintf h "%s" s
   | Mload (sz,ofs,addr) ->
       Format.fprintf h "(LOAD_%d %s %a)"
-        sz (Int32.to_string ofs)
+        sz (to_string ofs)
         print_expr addr
   | Mlb (ofs,addr) ->
       Format.fprintf h "(lb %s %a)"
-        (Int32.to_string ofs)
+        (to_string ofs)
         print_expr addr
   | Mlw (ofs,addr) ->
       Format.fprintf h "(lw %s %a)"
-        (Int32.to_string ofs)
+        (to_string ofs)
         print_expr addr
   | Mstor (sz,e,ofs,addr) ->
       Format.fprintf h "(STOR_%d %a %s %a)"
         sz
         print_expr e
-        (Int32.to_string ofs)
+        (to_string ofs)
         print_expr addr
   | Msb (e,ofs,addr) ->
       Format.fprintf h "(sb %a %s %a)"
         print_expr e
-        (Int32.to_string ofs)
+        (to_string ofs)
         print_expr addr
   | Msw (e,ofs,addr) ->
       Format.fprintf h "(sw %a %s %a)"
         print_expr e
-        (Int32.to_string ofs)
+        (to_string ofs)
         print_expr addr
   | Mand (e1,e2) ->
       Format.fprintf h "(%a && %a)"
@@ -125,17 +129,24 @@ let rec print_instr h = function
       Format.fprintf h "return %a;@\n"
         print_expr e
 
-let print_comma_sep_array h a =
-  let n = Array.length a in
+let print_comma_sep_array h n a =
   for i = 0 to n-1 do
     Format.fprintf h "%d" a.(i);
     if i<n-1 then
       Format.fprintf h ","
   done
 
-let print_fct h {fid=f;argsz=a;body=i;retsz=r} =
+let print_fct h
+  {
+    retsz=rs;
+    fid=f;
+    locsz=a;
+    formals=fml;
+    locals=lcl;
+    body=i;
+  } =
   Format.fprintf h "%d %s(%a)@\n  @[%a@]@\n"
-    r f print_comma_sep_array a
+    rs f (fun h -> print_comma_sep_array h fml) a
     (fun h -> List.iter (print_instr h)) i
 
 let print_file h (f,v,dat) =

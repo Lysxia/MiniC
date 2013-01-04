@@ -4,7 +4,8 @@
 ## Append > /dev/zero to shut them up
 
 DEP=error.ml ast.mli parser.mly lexer.mll smap.ml \
-    typing.ml typing.mli ast_printer.ml iselect.ml print_ist.ml
+    typing.ml typing.mli ast_printer.ml iselect.ml \
+		print_ist.ml rtl.ml print_rtl.ml
 PARSER_GEN=parser.automaton parser.conflicts
 BIN=minic
 

@@ -13,6 +13,7 @@ let batch = ref false
 let output = ref true
 let print_tast = ref false
 let is = ref false
+let rtl = ref false
 
 let usage = Printf.sprintf
   "Usage : %s program.c [-parse-only] [-type-only]"
@@ -31,6 +32,8 @@ let speclist = [
     "Print typed AST ; implies -type-only";
   "-istree", Arg.Set is,
     "Print tree after instruction selection";
+  "-rtl", Arg.Set rtl,
+    "Print Register Transfer Language tree";
   ]
 
 let args = ref []
@@ -52,18 +55,22 @@ let compile file =
       end;
     if !type_only then interrupt 0;
     let ist = Iselect.file tast in
-      if !is
-        then begin
-          Print_ist.print_file fstdout ist;
-          interrupt 0;
-        end;
+    if !is
+      then begin
+        Print_ist.print_file fstdout ist;
+        interrupt 0;
+      end;
+    let f,_,_ as rt = Rtl.mk_graph ist in
+    if !rtl
+      then begin
+        List.iter (Print_rtl.print_fct fstdout) f;
+        interrupt 0;
+      end;
     0
   with
     | Error.E (sp,ep,s) -> close_in h; Error.prerr file sp ep s; 1
     | Parser.Error -> close_in h; Error.syntax file lexbuf; 1
     | Interrupt n -> n
-    | _ -> close_in h; Printf.eprintf "(╯°^°）╯︵ ┻━┻ Unexpected error.\n%!"; 2
-
 
 let () =
   try 
@@ -86,4 +93,4 @@ let () =
           exit 2;
     in main !args
   with
-    | _ -> Printf.fprintf stdout "(╯°^°）╯︵ ┻━┻ Unexpected error.\n%!"; exit 2
+    | Interrupt 2 -> Printf.fprintf stdout "(╯°^°）╯︵ ┻━┻ Unexpected error.\n%!"; exit 2
