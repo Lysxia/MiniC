@@ -480,7 +480,9 @@ let typeconstr =
        | E s -> error loc s
   in
   Hashtbl.add constr_of_tid !free id;
-  let env = { env with mb=Imap.add !free (fill 0 (n-1) Sset.empty Smap.empty vl) env.mb } in
+  let env = {
+    env with
+    mb=Imap.add !free (fill 0 (n-1) Sset.empty Smap.empty vl) env.mb } in
   incr free;
   env, (t,members)
 
@@ -530,7 +532,7 @@ let type_prog { desc=ast ; loc=loc } =
             let vl =
               Smap.fold (fun s d vl -> (d,s)::vl) env.glo []
             in
-            cl,fl,vl
+            List.rev cl,List.rev fl,vl
           | _ -> let sp,ep = main_loc ast in
           raise (Error.E (sp,ep,
           "function main has incorrect prototype"));

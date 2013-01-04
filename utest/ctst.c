@@ -1,13 +1,19 @@
-/*  Testing C syntax
+/*  Testing C specs
  *  call gcc -c 'this_file.c'
  */
 
-#define TEST 34
-
-#define MIN_INT 0x80000000
-
 #include <stdio.h>
 #include <stdlib.h>
+
+#define TEST 43
+
+#define MIN_INT 0x80000000
+#define MAX_INT 0x7fffffff
+
+void print(int m)
+{
+  printf("%d\n",m);
+}
 
 #if TEST==0
 int main(int argc, char** argv)
@@ -233,13 +239,67 @@ int main()
 #if TEST==32
       char a=255;
       int c= 256;
-      printf("%d\n",c+a);
+      print(c+a);
 #endif
 #if TEST==33
-      printf("%d\n",(0x80000000)/(-1));
+      print((0x80000000)/(-1));
+      print(0x80000000);
 #endif
 #if TEST==34
-      printf("%d\n",-MIN_INT);
+      print(-MIN_INT);
+      print(MAX_INT);
+      print(MIN_INT-MAX_INT);
+      print(MIN_INT+(-MAX_INT));
+      print(MAX_INT-MIN_INT);
+      print(MAX_INT+(-MIN_INT));
+      print(-MAX_INT-1);//segfault
+      print(0x100000000);
+#endif
+#if TEST==35
+      print((MAX_INT+1)*0);//segfault
+#endif
+#if TEST==36
+      int i;
+      int j;
+      i = MAX_INT;
+      j = 1;
+      print(i+j);
+#endif
+#if TEST==37
+      5/0;
+#endif
+#if TEST==38
+      print(0x00000000);
+#endif
+#if TEST==39
+      int i=0;
+      int j=0;
+      if ((i=1) || (j=1))
+        print(i);
+      print(j);
+#endif
+#if TEST==40
+      int i=1;
+      int j=1;
+      if ((i=0)*(j=0))
+        ;
+      print(i);
+      print(j);
+#endif
+#if TEST==41
+      int i=MAX_INT;
+      if (i+1<10)
+        print(i);
+      print(i);
+#endif
+#if TEST==42
+      int i=2;
+      if ((i=0)||1)
+        print(1);
+      print(i);
+#endif
+#if TEST==43
+      printf("%c\n","a"[0]);
 #endif
     return 0;
 }

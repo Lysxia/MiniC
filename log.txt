@@ -15,4 +15,35 @@
 -- int, char, t* first in a0-a3 then stacked
 -- struct and unions always stacked
 - char c=255; c+1; second instruction will be defined behavior only mod 256
-- int a; &a; how to manage the address of a when a is allocated on a register ? create another variable...
+- int a; &a;
+-- how to manage the address of a when a is allocated on a register ?
+-- We DON'T. &a forces a to be on the stack
+
+01/04
+- 1/0 raises a div_by_zero error
+-- Except when it is optimized out
+- additions and substractions are taken mod 2^32 by gcc
+- MIPS overflows are execution failures
+-- Our compiler may erase such failures while partially
+-- evaluating because OCaml Int32 module arithmetic is taken mod 2^32
+-- and whoever wants to use those errors effectively in their program
+-- is an idiot or just weird because that's MiniC,
+-- something that exists only at the ENS.
+--- OR WE COULD USE UNSIGNED ADD / SUB WITHOUT OVERFLOW
+--- subu is just sub but no overflow
+
+- MIN_INT/-1 give 0 by gcc, MIN_INT by MIPS divider
+
+- MIPS div and rem as pseudo-instr use
+- the same basic instr div then just pick quotient or remainder
+- That could be implemented during instruction selection by adding
+- mflo (quo) and mfhi (div) as instructions
+
+- use sltu to check equal to zero and to transform into a boolean
+- we could optimize using only basic instructions but its long and complicated
+
+- seq is NOT optimal through MARS
+
+- We will try to use basic ops for boolean operations
+
+- unsigned comparison seems promising

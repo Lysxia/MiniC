@@ -8,6 +8,16 @@ let rec print_unop h = function
       Format.fprintf h "subi %s" (Int32.to_string n)
   | Muli n ->
       Format.fprintf h "muli %s" (Int32.to_string n)
+  | Divi n ->
+      Format.fprintf h "div(i) %s" (Int32.to_string n)
+  | Remi n ->
+      Format.fprintf h "rem(i) %s" (Int32.to_string n)
+  | Slti n ->
+      Format.fprintf h "slti %s" (Int32.to_string n)
+  | Sltiu n ->
+      Format.fprintf h "sltiu %s" (Int32.to_string n)
+  | Sll k ->
+      Format.fprintf h "sll %d" k
 
 let rec string_binop = function
   | Add -> "add"
@@ -15,11 +25,9 @@ let rec string_binop = function
   | Mul -> "mul"
   | Sub -> "sub"
   | Rem -> "rem"
-  | Seq -> "seq"
-  | Sge -> "sge"
-  | Sgt -> "sgt"
+  | Slt -> "slt"
   | Sle -> "sle"
-  | Sne -> "sne"
+  | Sltu -> "sltu"
 
 
 let rec print_expr h = function
@@ -77,10 +85,6 @@ let rec print_expr h = function
       Format.fprintf h "(%a || %a)"
         print_expr e1
         print_expr e2
-  | Mignore (e1,e2) ->
-      Format.fprintf h "(%a,%a)"
-        print_expr e1
-        print_expr e2
   | Mcall (f,l) ->
       Format.fprintf h "%s(%a)"
         f
@@ -134,5 +138,5 @@ let print_fct h {fid=f;argsz=a;body=i;retsz=r} =
     r f print_comma_sep_array a
     (fun h -> List.iter (print_instr h)) i
 
-let print_file h (c,f,v) =
+let print_file h (f,v,dat) =
   List.iter (print_fct h) f
