@@ -16,7 +16,7 @@ type munop =
   | Divi of t (* WRITTEN div IN MIPS *)
   | Remi of t
   | Addi of t | Muli of t | Subi of t
-  | Slti of t | Seqi of t | Snei of t
+  | Slti of t | Seqi of t | Snei of t | Sgti of t
   | Andi of t
   | Sll of int
 
@@ -270,14 +270,14 @@ and mk_sle e1 e2 = match e1,e2 with
       if compare n m >= 0
         then Mconst one
         else Mconst zero
-  | Mconst n,e2 ->
+  | Mconst n,e ->
       if n=min_int
-        then Mor (e2,Mconst one)
-        else Mbinop (Slt,Mconst (pred n),e2)
-  | e1,Mconst n ->
+        then Mor (e, Mconst one)
+        else Munop (Sgti (pred n), e)
+  | e,Mconst n ->
       if n=max_int
-        then Mor (e1,Mconst one)
-        else Mbinop (Slt,e1,Mconst (succ n))
+        then Mor (e, Mconst one)
+        else Munop (Slti (succ n), e)
   | e1,e2 -> Mbinop (Sle,e1,e2)
 
 and mk_slt e1 e2 = match e1,e2 with
@@ -286,6 +286,7 @@ and mk_slt e1 e2 = match e1,e2 with
         then Mconst one
         else Mconst zero
   | e, Mconst m -> Munop (Slti m,e)
+  | Mconst m, e -> Munop (Sgti m,e)
   | e1,e2 -> Mbinop (Slt,e1,e2)
 
 and mk_sne e1 e2 = match mk_sub e1 e2 with

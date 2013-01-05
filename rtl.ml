@@ -23,8 +23,8 @@ type i32 = Int32.t
 type u=munop
 type b=mbinop
 type ubranch =
-  | Bgez | Bgezal | Blez | Bltz | Bltzal
-  | Beqi of i32 | Beqzi | Blti of i32 | Bnei of i32
+  | Bgtz | Bgtzal | Bgez | Bgezal | Blez | Bltz | Bltzal | Beqz | Bnez
+  | Beqi of i32 | Beqzi | Blti of i32 | Bgti of i32 | Bnei of i32
 type bbranch = Beq | Bne | Blt | Ble
 
 type instr =
@@ -133,27 +133,35 @@ let rec expr r e l =
 and condition e lif lelse =
   match e with
   | Mconst m -> if m=Int32.zero then lelse else lif
-  | Munop (Iselect.Move i,e) ->
-      let r_ = R.fresh () in
-      let ri = find_loc i in
-      condition e (generate (Move (ri,r_,lif)))
-                  (generate (Move (ri,r_,lelse)))
   | Munop (Muli zero,e) ->
       expr (R.fresh ()) e lelse
-  | Mand (e1,e2) ->
-      condition e1 (condition e2 lif lelse) lelse 
-  | Mor (e1,e2) ->
-      condition e1 lif (condition e2 lif lelse)
   | Munop (Neg,e) -> condition e lif lelse
+  | Mand (e1,e2) -> condition e1 (condition e2 lif lelse) lelse 
+  | Mor (e1,e2) -> condition e1 lif (condition e2 lif lelse)
   | Munop (Slti n,e) ->
       let r = R.fresh () in
-      expr r e (generate (Ubch (Blti n,r,lif,lelse)))
+      expr r e (generate (
+        if n = zero
+          then Ubch (Bltz, r,lif,lelse)
+          else Ubch (Blti n,r,lif,lelse)))
+  | Munop (Sgti n,e) ->
+      let r = R.fresh () in
+      expr r e (generate (
+        if n = zero
+          then Ubch (Bgtz, r,lif,lelse)
+          else Ubch (Bgti n,r,lif,lelse)))
   | Munop (Seqi n, e) ->
       let r = R.fresh () in
-      expr r e (generate (Ubch (Beqi n,r,lif,lelse)))
+      expr r e (generate (
+        if n = zero
+          then Ubch (Beqz, r,lif,lelse)
+          else Ubch (Beqi n,r,lif,lelse)))
   | Munop (Snei n, e) ->
       let r = R.fresh () in
-      expr r e (generate (Ubch (Bnei n,r,lif,lelse)))
+      expr r e (generate (
+        if n = zero
+          then Ubch (Bnez, r,lif,lelse)
+          else Ubch (Bnei n,r,lif,lelse)))
   | Mbinop (Seq,e1,e2) ->
       let r1 = R.fresh () in
       let r2 = R.fresh () in
@@ -180,7 +188,7 @@ and condition e lif lelse =
           generate (Bbch (Ble,r1,r2,lif,lelse))))
   | e ->
       let r = R.fresh () in
-      expr r e (generate (Ubch (Beqi zero,r,lif,lelse)))
+      expr r e (generate (Ubch (Beqz,r,lif,lelse)))
 
 let expr_list = List.fold_right (fun e l -> expr (R.fresh()) e l)
 

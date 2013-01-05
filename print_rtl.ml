@@ -5,14 +5,19 @@ open Int32
 open Format
 
 let ub_string = function
+  | Bgtz -> "bgtz"
+  | Bgtzal -> "bgtzal"
   | Bgez -> "bgez"
   | Bgezal -> "bgezal"
   | Blez -> "blez"
   | Bltz -> "bltz"
   | Bltzal -> "bltzal"
   | Beqzi -> "beqzi"
+  | Bnez -> "bnez"
+  | Beqz -> "beqz"
   | Beqi n -> "beqi("^to_string n^")"
   | Blti n -> "blti("^to_string n^")"
+  | Bgti n -> "bgti("^to_string n^")"
   | Bnei n -> "bnei("^to_string n^")"
 
 let bb_string = function
