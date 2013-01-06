@@ -60,10 +60,16 @@ let compile file =
         Print_ist.print_file fstdout ist;
         interrupt 0;
       end;
-    let f,_,_ as rt = Rtl.mk_graph ist in
     if !rtl
       then begin
+        let f,_,_ as rt = Ertl.rtl_of_is ist in
         List.iter (Print_rtl.print_fct fstdout) f;
+        interrupt 0;
+      end;
+    if !ertl
+      then begin
+        let f,_,_ as rt = Ertl.ertl_of_is ist in
+        List.iter (Print_rtl.print_ertlfct fstdout) f;
         interrupt 0;
       end;
     0

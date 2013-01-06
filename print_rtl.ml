@@ -26,32 +26,49 @@ let bb_string = function
   | Blt -> "blt"
   | Ble -> "ble"
 
+let reg_string = function
+  | R.R r -> "R"^string_of_int r
+  | R.F r -> string_of_int r^"($fp)"
+  | R.S r -> string_of_int r^"($sp)"
+
 let rec print_rl ch = function
   | [] -> ()
-  | [h] -> fprintf ch "#%d" h
-  | h::t -> fprintf ch "#%d " h;
+  | [h] -> fprintf ch "#%s" (reg_string h)
+  | h::t -> fprintf ch "#%s " (reg_string h);
       print_rl ch t
 
 let print_instr h = function
-  | Const (r,n,l) -> fprintf h "#%d <- %s\t|%d" r (to_string n) l
-  | Move (r,s,l) -> fprintf h "#%d <- #%d\t|%d" r s l
-  | Unop (r,u,s,l) -> fprintf h "#%d <- %s #%d\t|%d" r (unop_string u) s l
-  | Binop (r,o,s,t,l) -> fprintf h "#%d <- %s #%d #%d\t|%d"
-      r (binop_string o) s t l
-  | La (r,s,l) -> fprintf h "#%d <- %s\t|%d" r s l
-  | Addr (r,s,l) -> fprintf h "#%d <- &#%d\t|%d" r s l
-  | Load (r,sz,n,s,l) -> fprintf h "#%d <- Load(%d) %s(#%d)\t|%d"
-      r sz (to_string n) s l
+  | Const (r,n,l) -> fprintf h "#%s <- %s\t|%d" (reg_string r) (to_string n) l
+  | Move (r,s,l) -> fprintf h "#%s <- #%s\t|%d" (reg_string r) (reg_string s) l
+  | Unop (r,u,s,l) -> fprintf h "#%s <- %s #%s\t|%d"
+      (reg_string r) (unop_string u) (reg_string s) l
+  | Binop (r,o,s,t,l) -> fprintf h "#%s <- %s #%s #%s\t|%d"
+      (reg_string r) (binop_string o) (reg_string s) (reg_string t) l
+  | La (r,x,l) -> fprintf h "#%s <- %s\t|%d" (reg_string r) x l
+  | Addr (r,s,l) -> fprintf h "#%s <- &#%s\t|%d" (reg_string r) (reg_string s) l
+  | Load (r,sz,n,s,l) -> fprintf h "#%s <- Load(%d) %s(#%s)\t|%d"
+      (reg_string r) sz (to_string n) (reg_string s) l
   | Lw (r,n,s,l)
-  | Lb (r,n,s,l) -> fprintf h "#%d <- l- %s(#%d)\t|%d" r (to_string n) s l
-  | Stor (r,t,sz,n,s,l) -> fprintf h "#%d <- Store(%d) #%d %s(#%d)\t|%d"
-      r sz t (to_string n) s l
+  | Lb (r,n,s,l) -> fprintf h "#%s <- l- %s(#%s)\t|%d"
+      (reg_string r) (to_string n) (reg_string s) l
+  | Stor (r,t,sz,n,s,l) -> fprintf h "#%s <- Store(%d) #%s %s(#%s)\t|%d"
+      (reg_string r) sz (reg_string t) (to_string n) (reg_string s) l
   | Sw (r,t,n,s,l)
-  | Sb (r,t,n,s,l) -> fprintf h "#%d <- s- #%d %s(#%d)\t|%d" r t (to_string n) s l
-  | Call (r,f,rl,l) -> fprintf h "#%d <- %s(%a)\t|%d" r f print_rl rl l
+  | Sb (r,t,n,s,l) -> fprintf h "#%s <- s- #%s %s(#%s)\t|%d"
+      (reg_string r) (reg_string t) (to_string n) (reg_string s) l
+  | Call (r,f,rl,l) -> fprintf h "#%s <- %s(%a)\t|%d"
+      (reg_string r) f print_rl rl l
   | Jump l -> fprintf h "|%d" l
-  | Ubch (u,r,l,m) -> fprintf h "%s %d |%d %d" (ub_string u) r l m
-  | Bbch (b,r,s,l,m) -> fprintf h "%s %d %d |%d %d" (bb_string b) r s l m
+  | Ubch (u,r,l,m) -> fprintf h "%s #%s |%d %d" (ub_string u) (reg_string r) l m
+  | Bbch (b,r,s,l,m) -> fprintf h "%s #%s #%s |%d %d"
+      (bb_string b) (reg_string r) (reg_string s) l m
+  | ECall (f,fml,l) -> fprintf h "%s(%a) |%d" f print_rl fml l
+  | Syscall l -> fprintf h "syscall | %d" l
+  | Alloc_frame l -> fprintf h "alloc_frame | %d" l
+  | Free_frame l -> fprintf h "free_frame | %d" l
+  | Return -> fprintf h "return"
+  | ETCall (f,fml) -> fprintf h "return %s(%a)" f print_rl fml
+  | Label (s,l) -> fprintf h "lab:%s | %d" s l
 
 let print_fct h {
   ident=f;
@@ -62,9 +79,21 @@ let print_fct h {
   exit=exit;
   body=body;
   } =
-    fprintf h "#%d %s(%a)@\n  @[Start: %d@\n"
-      ret f print_rl formals entry;
+    fprintf h "#%s %s(%a)@\n  @[Start: %d@\n"
+      (reg_string ret) f print_rl formals entry;
     L.M.iter (fun l i -> fprintf h "%d : %a@\n" l print_instr i) body;
     fprintf h "@]@."
 
-
+let print_ertlfct h {
+  ident=f;
+  formals=formals;
+  ret=ret;
+  entry=entry;
+  body=body;
+  ce_saved=_;
+  cr_saved=_;
+  } =
+    fprintf h "#%s %s(%a)@\n  @[Start: %d@\n"
+      (reg_string ret) f print_rl formals entry;
+    L.M.iter (fun l i -> fprintf h "%d : %a@\n" l print_instr i) body;
+    fprintf h "@]@."

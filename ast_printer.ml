@@ -75,7 +75,7 @@ let print_tfct h {tret=t;tfid=f;formals=n;locals=l;tbody=il} =
   Format.fprintf h "%s %a(%a)@\n  @[%a@\n%a@]@\n"
     (string_of_tt t) print_tname f (fun h -> print_arg h n) l
     (fun h -> print_locals h n) l
-    (fun h -> List.iter (print_tinstr h)) il
+    print_tinstr il
 
 let print_tfile h (_,fl,_) =
   List.iter (print_tfct h) fl

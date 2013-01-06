@@ -55,7 +55,7 @@ type tfct = {
   tfid    : tname;
   formals : int;
   locals  : tt array;
-  tbody   : tinstr list;
+  tbody   : tinstr;
   }
 
 type tfile = tconstr list*tfct list*tvdec list

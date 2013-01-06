@@ -65,7 +65,7 @@ type fct = {
   formals:int;
   locals:int;
   locsz:int array;
-  body:instr list
+  body:instr
 }
 
 let byte = of_int 255
@@ -315,7 +315,6 @@ let mk_stor t_size e1 n e2 =
 *)
 
 let mk_move e1 e2 = match e1,e2 with
-  | e1,e2 when e1=e2 -> e2
   | Mlw (ofs,e1),e2 -> Msw (e2,ofs,e1)
   | Mlb (ofs,e1),e2 -> Msb (e2,ofs,e1)
   | Mload (sz,ofs,e1),e2 -> Mstor (sz,e2,ofs,e1)
@@ -392,7 +391,6 @@ let rec isexpr {tdesc=e ; t=tt} = match e with
           mk_add
           (isexpr e2)
           (mk_mul (Mconst (of_int sz)) (isexpr e1))
-      | C,C -> Munop (Andi byte, (mk_add (isexpr e1) (isexpr e2)))
       | _,_ -> mk_add (isexpr e1) (isexpr e2)
       end
   | TBinop (Ast.Sub,e1,e2) ->
@@ -402,7 +400,6 @@ let rec isexpr {tdesc=e ; t=tt} = match e with
           mk_sub
           (isexpr e1)
           (mk_mul (Mconst (of_int sz)) (isexpr e2))
-      | C -> Munop (Andi byte, (mk_sub (isexpr e1) (isexpr e2)))
       | _ -> mk_sub (isexpr e1) (isexpr e2)
       end
   | TBinop (o,e1,e2) -> mk_binop o (isexpr e1) (isexpr e2)
@@ -427,9 +424,9 @@ let rec isinstr t0 = function
   | TReturn None -> Ret None
   | TReturn (Some e) ->
       Ret (Some (
-      if t0=C && e.t<>C
+      (*if t0=C && e.t<>C
         then Munop (Andi byte, (isexpr e))
-        else isexpr e))
+        else*) isexpr e))
 
 
 let isfct {
@@ -437,7 +434,7 @@ let isfct {
   tfid=f;
   Typing.formals=argc;
   locals=lcl;
-  tbody=il;
+  tbody=i;
 } = 
   {
     retsz=sizeof t;
@@ -445,7 +442,7 @@ let isfct {
     formals=argc;
     locals=Array.length lcl;
     locsz=Array.map sizeof lcl;
-    body=List.map (isinstr t) il;
+    body=isinstr t i;
   }
 
 let gvars vl =
@@ -467,6 +464,8 @@ let isconstr = function
         sz := !sz + sizeof s.(i);
         f_loc.(i) <- of_int (!sz-4);
       done;
+      if !align
+        then sz := (!sz+3)/4*4;
       Hashtbl.add constr i (!sz,!align,f_loc)
   | U i,u ->
       let s_max = ref 0 in
@@ -476,6 +475,8 @@ let isconstr = function
         if aligned u.(i)
           then align := true;
       done;
+      if !align
+        then s_max := (!s_max+3)/4*4;
       Hashtbl.add constr i (!s_max,!align,[||])
   | _ -> assert false
 

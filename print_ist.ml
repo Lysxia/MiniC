@@ -18,6 +18,8 @@ let rec unop_string = function
       Format.sprintf "rem_i(%s)" (to_string n)
   | Slti n ->
       Format.sprintf "slti(%s)" (to_string n)
+  | Sgti n ->
+      Format.sprintf "sgti(%s)" (to_string n)
   | Seqi n ->
       Format.sprintf "seqi(%s)" (to_string n)
   | Snei n ->
@@ -147,7 +149,7 @@ let print_fct h
   } =
   Format.fprintf h "%d %s(%a)@\n  @[%a@]@\n"
     rs f (fun h -> print_comma_sep_array h fml) a
-    (fun h -> List.iter (print_instr h)) i
+    print_instr i
 
 let print_file h (f,v,dat) =
   List.iter (print_fct h) f

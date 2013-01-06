@@ -66,7 +66,7 @@ type tfct = {
   tfid    : tname;
   formals : int;
   locals  : tt array; (* numbered 0..(n-1), formals among them *)
-  tbody   : tinstr list;
+  tbody   : tinstr;
   }
 
 type tfile =
@@ -512,7 +512,7 @@ let typefun env loc {ret=t;fid=id;arg=arg;locv=decl;body=instr} =
       tfid   = id;
       formals= env.free;
       locals = Array.of_list (List.rev env1.lclacc);
-      tbody  = il
+      tbody  = TBloc il
       },env
   with E s -> error loc s
 (*****)

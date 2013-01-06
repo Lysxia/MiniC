@@ -2,9 +2,28 @@ open Iselect
 
 module R = struct
   type t = int
-  let free = ref 0
-  let fresh () = incr free; !free
-  module S = Set.Make(struct type t=int let compare=compare end)
+  type mat =
+    | R of t (* register nb (< 32 if physical, otherwise pseudo) *)
+    | F of int
+    | S of int
+  let free = ref 31
+  let fresh () = incr free; R !free
+  let z  = R 0 (* is a special one *)
+  let v0 = R 2
+  let a0 = R 4
+  let gp = R 28
+  let sp = R 29
+  let fp = R 30
+  let ra = R 31
+  let callee_saved = [R 16;R 17;R 18;R 19;R 20;R 21;R 22;R 23]
+  let caller_saved = List.map (fun x -> R x)
+    [2;3;4;5;6;7;8;9;10;11;12;13;14;15;24;25;30;31]
+  let compare a b=match a,b with
+    | R a,R b | F a,F b | S a,S b -> compare a b
+    | R _,F _ | R _,S _ | F _,S _ -> 1
+    | F _,R _ | S _,R _ | S _,F _ -> -1
+  module M = Map.Make(struct
+    type t=mat let compare=compare end)
 end
 
 module L = struct
@@ -16,7 +35,7 @@ end
 
 (*****************)
 
-type reg = R.t
+type reg = R.mat
 type lab = L.t
 type i32 = Int32.t
 
@@ -27,6 +46,7 @@ type ubranch =
   | Beqi of i32 | Beqzi | Blti of i32 | Bgti of i32 | Bnei of i32
 type bbranch = Beq | Bne | Blt | Ble
 
+ (* We will be using $fp for moving things *)
 type instr =
   | Const of reg*i32        *lab
   | Move  of reg*reg        *lab
@@ -40,22 +60,44 @@ type instr =
   | Stor  of reg*reg*int*i32*reg*lab
   | Sw    of reg*reg*i32*reg    *lab
   | Sb    of reg*reg*i32*reg    *lab
-  | Call  of reg*string*reg list*lab
   | Jump  of lab
   | Ubch  of ubranch*reg*lab*lab
   | Bbch  of bbranch*reg*reg*lab*lab
+  | Call  of reg*string*reg list*lab
+  | Syscall of lab
+  | Alloc_frame of lab
+  | Free_frame of lab
+  | ECall of string*lab
+  | ETCall of string
+  | Return
+  | Label of string*lab
 
 type graph = instr L.M.t
 
+(* As is stated below, we do final call, and for efficiency we
+ * will use two start labels in functions which need callee-saved
+ * registers, so that we try not to store them twice,
+ * we also keep track of actually USED caller_saved registers
+ * so that we do not have to store them all as caller *)
 type fct = {
   ident:string;
-  formals:reg list;
-  return:reg;
-  locals:R.S.t;
-  entry:lab;
-  exit:lab;
-  body:graph;
+  mutable s_ident:string;
+  formals:int;
+  locals:reg array;
+  mutable return:reg; (* location of return *)
+  mutable entry:lab;
+  mutable exit:lab;
+  mutable body:graph;
+  mutable cr_saved:reg list; (* must only be R construct *)
+  mutable ce_saved:(reg*reg) list;
+  (* fst : physical register (< 32)
+   * snd : storage location (either physical in frame or
+   * pseudo reg in the case of recursive functions not yet in LTL)*)
 }
+
+(***********************************************)
+(* WE IMPLEMENT FINAL CALL FOR ANY FUNCTION *)
+
 
 (* As was done in class *)
 let graph = ref L.M.empty
@@ -65,12 +107,7 @@ let init () =
   graph := L.M.empty;
   Hashtbl.clear locals
 
-let find_loc i =
-  try
-    Hashtbl.find locals i
-  with
-  | Not_found -> Printf.eprintf "Error %d\n%!" i;
-      failwith "Error."
+let find_loc = Hashtbl.find locals
 
 let generate i =
   let l = L.fresh() in
@@ -108,7 +145,7 @@ let rec expr r e l =
   | Mstor (sz,e1,ofs,e2) ->
       let r1 = R.fresh () in
       let r2 = R.fresh () in
-      expr r2 e2 (expr r1 e1 (generate (Stor (r,sz,r1,ofs,r2,l))))
+      expr r2 e2 (expr r1 e1 (generate (Stor (r,r1,sz,ofs,r2,l))))
   | Msw (e1,ofs,e2) ->
       let r1 = R.fresh () in
       let r2 = R.fresh () in
@@ -220,24 +257,27 @@ let fct {
   Iselect.formals=fml;
   Iselect.locals=lcl;
   locsz=a;
-  Iselect.body=il} =
+  Iselect.body=i} =
   init ();
   let ret = R.fresh () in
   let exit = L.fresh () in
   let lcl = Array.init lcl (fun _ -> R.fresh ()) in
   Array.iteri (Hashtbl.add locals) lcl;
-  let formals = Array.to_list (Array.sub lcl 0 fml) in
-  let entry =
-    List.fold_right (fun i l -> instr ret i exit l) il exit in
-  {
+  let entry = instr ret i exit exit in
+  {  
     ident=f;
-    formals=formals;
-    locals =Hashtbl.fold (fun _ r s -> R.S.add r s) locals R.S.empty;
-    return = ret;
-    entry = entry;
-    exit = exit;
+    formals=fml;
+    locals=lcl;
+    return=ret;
+    entry=entry;
+    exit=exit;
     body = !graph;
+    (* putting some dummy values *)
+    cr_saved=R.caller_saved;
+    ce_saved=[];
+    s_ident="";
   }
 
-let mk_graph (f,c,data) =
-  List.map fct f,c,data
+let rtl_of_is (f,v,data) =
+  let f = List.map fct f in
+  f,v,data

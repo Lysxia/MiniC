@@ -310,6 +310,7 @@ int main()
 #if TEST==45
       print(((char) 128)*((char) 128));
       print(((char) 128)+(char) 129);
+      print(((char) 254)+((char) 1)+((char) 1));
       print((char) 256);
 #endif
     return 0;

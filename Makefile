@@ -5,7 +5,8 @@
 
 DEP=error.ml ast.mli parser.mly lexer.mll smap.ml \
     typing.ml typing.mli ast_printer.ml iselect.ml \
-		print_ist.ml rtl.ml print_rtl.ml
+		print_ist.ml rtl.ml print_rtl.ml \
+		ertl.ml
 PARSER_GEN=parser.automaton parser.conflicts
 BIN=minic
 
