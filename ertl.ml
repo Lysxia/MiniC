@@ -64,16 +64,18 @@ let instr exit e = match e with
   | ETCall _ | Label _ ->
       assert false
 
+let move r t l = generate (Move (t,r,l))
+
 let fun_entry f savers fml entry =
   let l = generate (Label ("s_"^f,entry)) in
-  let l = List.fold right (fun (t, r) l -> move r t l) savers l in
-  generate (Alloc_frame l)
+  let l = generate (Alloc_frame l) in
+  List.fold_right (fun (r, t) l -> move r t l) savers l
 
 let fun_exit savers return exit =
-  let l = generate (Edelete frame (generate Ereturn)) in
-  let l = List.fold right (fun (t, r) l -> move t r l) savers l in
-  let l = move retr Register.result l in
-    graph := Label.M.add exitl (Egoto l) !graph
+  let l = List.fold_right (fun (r, t) l -> move t r l) savers
+    (generate Return) in
+  let l = generate (Free_frame l) in
+  graph := L.M.add exit (Jump l) !graph
 
 
 let deffun f =
@@ -85,9 +87,14 @@ let deffun f =
   if f.ident <> "main"
     then f.ident <- "_"^f.ident;
   let entry = fun_entry f.ident savers f.formals f.entry in
-  let body = fun_exit savers f.return f.exit in
+  fun_exit savers f.return f.exit;
+  f.body <- !graph;
+  f.entry <- entry
 
-let ertl_of_isf f = deffun (Rtl.fct f)
+let ertl_of_isf f =
+  let f = Rtl.fct f in
+  deffun f;
+  f
 
 let ertl_of_is (f,v,d) =
   let f = List.map ertl_of_isf f in

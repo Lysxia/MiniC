@@ -44,7 +44,7 @@ let print_instr h = function
       (reg_string r) (unop_string u) (reg_string s) l
   | Binop (r,o,s,t,l) -> fprintf h "#%s <- %s #%s #%s\t|%d"
       (reg_string r) (binop_string o) (reg_string s) (reg_string t) l
-  | La (r,x,l) -> fprintf h "#%s <- %s\t|%d" (reg_string r) x l
+  | La (r,x,l) -> fprintf h "#%s <- la %s\t|%d" (reg_string r) x l
   | Addr (r,s,l) -> fprintf h "#%s <- &#%s\t|%d" (reg_string r) (reg_string s) l
   | Load (r,sz,n,s,l) -> fprintf h "#%s <- Load(%d) %s(#%s)\t|%d"
       (reg_string r) sz (to_string n) (reg_string s) l
@@ -62,16 +62,17 @@ let print_instr h = function
   | Ubch (u,r,l,m) -> fprintf h "%s #%s |%d %d" (ub_string u) (reg_string r) l m
   | Bbch (b,r,s,l,m) -> fprintf h "%s #%s #%s |%d %d"
       (bb_string b) (reg_string r) (reg_string s) l m
-  | ECall (f,fml,l) -> fprintf h "%s(%a) |%d" f print_rl fml l
+  | ECall (f,l) -> fprintf h "[%s] |%d" f l
   | Syscall l -> fprintf h "syscall | %d" l
   | Alloc_frame l -> fprintf h "alloc_frame | %d" l
   | Free_frame l -> fprintf h "free_frame | %d" l
   | Return -> fprintf h "return"
-  | ETCall (f,fml) -> fprintf h "return %s(%a)" f print_rl fml
+  | ETCall (f) -> fprintf h "return [%s]" f
   | Label (s,l) -> fprintf h "lab:%s | %d" s l
 
 let print_fct h {
   ident=f;
+  s_ident=_;
   formals=formals;
   locals=_;
   return=ret;
@@ -84,16 +85,3 @@ let print_fct h {
     L.M.iter (fun l i -> fprintf h "%d : %a@\n" l print_instr i) body;
     fprintf h "@]@."
 
-let print_ertlfct h {
-  ident=f;
-  formals=formals;
-  ret=ret;
-  entry=entry;
-  body=body;
-  ce_saved=_;
-  cr_saved=_;
-  } =
-    fprintf h "#%s %s(%a)@\n  @[Start: %d@\n"
-      (reg_string ret) f print_rl formals entry;
-    L.M.iter (fun l i -> fprintf h "%d : %a@\n" l print_instr i) body;
-    fprintf h "@]@."

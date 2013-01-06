@@ -80,9 +80,9 @@ type graph = instr L.M.t
  * we also keep track of actually USED caller_saved registers
  * so that we do not have to store them all as caller *)
 type fct = {
-  ident:string;
+  mutable ident:string;
   mutable s_ident:string;
-  formals:int;
+  formals:reg list;
   locals:reg array;
   mutable return:reg; (* location of return *)
   mutable entry:lab;
@@ -266,7 +266,7 @@ let fct {
   let entry = instr ret i exit exit in
   {  
     ident=f;
-    formals=fml;
+    formals=Array.to_list (Array.sub lcl fml 0);
     locals=lcl;
     return=ret;
     entry=entry;

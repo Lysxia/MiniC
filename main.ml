@@ -14,6 +14,7 @@ let output = ref true
 let print_tast = ref false
 let is = ref false
 let rtl = ref false
+let ertl = ref false
 
 let usage = Printf.sprintf
   "Usage : %s program.c [-parse-only] [-type-only]"
@@ -34,6 +35,8 @@ let speclist = [
     "Print tree after instruction selection";
   "-rtl", Arg.Set rtl,
     "Print Register Transfer Language tree";
+  "-ertl", Arg.Set ertl,
+    "Print ERTL"
   ]
 
 let args = ref []
@@ -62,14 +65,14 @@ let compile file =
       end;
     if !rtl
       then begin
-        let f,_,_ as rt = Ertl.rtl_of_is ist in
+        let f,_,_ as rt = Rtl.rtl_of_is ist in
         List.iter (Print_rtl.print_fct fstdout) f;
         interrupt 0;
       end;
     if !ertl
       then begin
         let f,_,_ as rt = Ertl.ertl_of_is ist in
-        List.iter (Print_rtl.print_ertlfct fstdout) f;
+        List.iter (Print_rtl.print_fct fstdout) f;
         interrupt 0;
       end;
     0
