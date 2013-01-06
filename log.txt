@@ -47,3 +47,7 @@
 - We will try to use basic ops for boolean operations
 
 - unsigned comparison seems promising
+
+01/05
+- build RTL in SSA form is more efficient
+- Bad idea because of dereferencing
