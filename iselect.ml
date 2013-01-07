@@ -85,6 +85,10 @@ let constr = Hashtbl.create 17
 
 let data:(int*string) list ref = ref []
 
+let reset () =
+  Hashtbl.clear constr;
+  data := []
+
 let aligned = function
   | C -> false
   | I | P _ -> true
@@ -210,7 +214,7 @@ and mk_div e1 e2 = match e1,e2 with
       Mconst (div n m)
   | e, Mconst n ->
       if n=zero
-        then Printf.printf "Warning : Divide by zero";
+        then Printf.printf "Warning : Divide by zero\n";
       Munop (Divi n,e)
   | e1,e2 -> Mbinop (Div, e1, e2)
 
@@ -219,7 +223,7 @@ and mk_rem e1 e2 = match e1,e2 with
       Mconst (rem n m)
   | e1,Mconst n ->
       if n=zero
-        then Printf.printf "Warning : Divide by zero";
+        then Printf.printf "Warning : Divide by zero\n";
       Munop (Remi n,e1)
   | e1,e2 -> Mbinop (Rem, e1, e2)
 
@@ -482,8 +486,6 @@ let isconstr = function
 
 
 let file (c,f,v) =
-  Hashtbl.clear constr;
-  data := [];
   List.iter isconstr c;
   let f,v = List.map isfct f,gvars v in
   f,v,!data

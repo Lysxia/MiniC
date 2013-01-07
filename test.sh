@@ -8,7 +8,7 @@
   egrep "Exit (0|2)"
 ./minic -batch -type-only tests/typing/good/*.c|\
   egrep "Exit (1|2)"
-./minic -batch tests/exec*/*.c |\
+./minic -batch -ertl tests/exec*/*.c |\
   egrep "Exit (1|2)"
 
 exit 0

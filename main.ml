@@ -11,7 +11,7 @@ let parse_only = ref false
 let type_only = ref false
 let batch = ref false
 let output = ref true
-let print_tast = ref false
+let print = ref false
 let is = ref false
 let rtl = ref false
 let ertl = ref false
@@ -29,50 +29,58 @@ let speclist = [
     "Do not write compiled result";
   "-batch",Arg.Set batch,
     "Compile multiple files (separately)";
-  "-ttree", Arg.Set print_tast,
-    "Print typed AST ; implies -type-only";
-  "-istree", Arg.Set is,
-    "Print tree after instruction selection";
+  "-print", Arg.Set print,
+    "Print compiled tree";
+  "-is", Arg.Set is,
+    "Stop after instruction selection";
   "-rtl", Arg.Set rtl,
-    "Print Register Transfer Language tree";
+    "Stop at Register Transfer Language";
   "-ertl", Arg.Set ertl,
-    "Print ERTL"
+    "Stop at ERTL"
   ]
 
 let args = ref []
 
 let collect arg = args := arg :: !args
 
+let reset () =
+  Iselect.reset ();
+  Rtl.reset ();
+  Ertl.reset ()
+
+
 let compile file =
   let h = open_in file in
   let lexbuf = Lexing.from_channel h in
   try
+    reset ();
     let ast = Parser.prog Lexer.token lexbuf in
     close_in h;
     if !parse_only then interrupt 0;
     let tast = Typing.type_prog ast in
-    if !print_tast
+    if !type_only
       then begin
-        Ast_printer.print_tfile fstdout tast;
+        if !print then Ast_printer.print_tfile fstdout tast;
         interrupt 0
       end;
-    if !type_only then interrupt 0;
     let ist = Iselect.file tast in
     if !is
       then begin
-        Print_ist.print_file fstdout ist;
+        if !print then Print_ist.print_file fstdout ist;
         interrupt 0;
       end;
     if !rtl
       then begin
         let f,_,_ as rt = Rtl.rtl_of_is ist in
-        List.iter (Print_rtl.print_fct fstdout) f;
+        if !print then List.iter (Print_rtl.print_fct fstdout) f;
         interrupt 0;
       end;
     if !ertl
       then begin
         let f,_,_ as rt = Ertl.ertl_of_is ist in
-        List.iter (Print_rtl.print_fct fstdout) f;
+        List.iter Ltlvlife.build f;
+        if !print then
+          List.iter (Print_rtl.print_blokfkt fstdout) f;
         interrupt 0;
       end;
     0

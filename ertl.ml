@@ -14,6 +14,15 @@ open Rtl
 
 let f_map = ref Smap.empty
 
+let reset () =
+  f_map := Smap.empty
+
+let find f =
+  try
+    Smap.find f !f_map
+  with
+  | Not_found -> Printf.eprintf "%s\n%!" f; assert false
+
 let rec set_arg fml_l arg_l l = match fml_l,arg_l with
   | [],[] -> l
   | f::fl,a::al -> set_arg fl al (generate (
@@ -23,15 +32,12 @@ let rec set_arg fml_l arg_l l = match fml_l,arg_l with
         | R.S _ -> assert false))
   | [],_ | _,[] -> assert false
 
-let rec set_arg_f fml_l arg_l l = match fml_l,arg_l with
-  | [],[] -> l
-  | f::fl,a::al -> set_arg_f fl al (generate (
-      match f with
-        | R.R _ | R.F _ -> Move (f,a,l)
-        | R.S _ -> assert false))
-  | [],_ | _,[] -> assert false
+let rec set_savers savers ce_saved l = match ce_saved with
+  | [] -> l
+  | (s,r)::t -> set_savers savers t (generate (
+      Move (r,(List.assoc s savers),l)))
 
-let instr exit e = match e with
+let instr savers exit e = match e with
   | Const _
   | Move _ | Unop _ | Binop _
   | La _ | Addr _
@@ -42,26 +48,28 @@ let instr exit e = match e with
       if f="sbrk"
         then Move (R.a0,List.hd arg,
           generate (Const (R.v0,Int32.of_int 9,
-            generate (Syscall l))))
+            generate (Syscall (generate (Move (r,R.v0,l)))))))
       else if f="putchar"
         then Move (R.a0,List.hd arg,
           generate (Const (R.v0,Int32.of_int 11,
             generate (Syscall l))))
       else if l = exit
         then begin
-          let f_ = Smap.find f !f_map in
+          let f_ = find f in
           let call = generate (ETCall f) in
-          L.M.find (set_arg_f f_.formals arg call) !graph
-          (* Careful with the output location *)
+          let args = set_arg f_.args arg call in
+          let save = set_savers savers f_.ce_saved args in
+          Jump save
+          (* Will have to be careful with the output location *)
         end
       else begin
-        let f_ = Smap.find f !f_map in
+        let f_ = find f in
         let res = generate (Move (r,f_.return,l)) in
         let call = generate (ECall (f,res)) in
-        L.M.find (set_arg f_.formals arg call) !graph
+        Jump (set_arg f_.formals arg call)
       end
   | ECall _ | Syscall _ | Alloc_frame _ | Free_frame _ | Return
-  | ETCall _ | Label _ ->
+  | ETCall _ | Label _ | Blok _ ->
       assert false
 
 let move r t l = generate (Move (t,r,l))
@@ -79,10 +87,11 @@ let fun_exit savers return exit =
 
 
 let deffun f =
-  graph := L.M.map (instr f.exit) f.body;
+  f_map := Smap.add f.ident f !f_map;
   let savers = List.map (fun r -> r,R.fresh())
       (R.ra :: R.callee_saved) in
-  f_map := Smap.add f.ident f !f_map;
+  L.M.iter
+    (fun l i -> graph := L.M.add l (instr savers f.exit i) !graph) f.body;
   f.s_ident <- "s_"^f.ident;
   if f.ident <> "main"
     then f.ident <- "_"^f.ident;

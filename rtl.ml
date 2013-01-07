@@ -22,7 +22,7 @@ module R = struct
     | R a,R b | F a,F b | S a,S b -> compare a b
     | R _,F _ | R _,S _ | F _,S _ -> 1
     | F _,R _ | S _,R _ | S _,F _ -> -1
-  module M = Map.Make(struct
+  module S = Set.Make(struct
     type t=mat let compare=compare end)
 end
 
@@ -71,6 +71,7 @@ type instr =
   | ETCall of string
   | Return
   | Label of string*lab
+  | Blok of instr list
 
 type graph = instr L.M.t
 
@@ -84,6 +85,7 @@ type fct = {
   mutable s_ident:string;
   formals:reg list;
   locals:reg array;
+  args:reg list; (* Registers from the callers perspective *)
   mutable return:reg; (* location of return *)
   mutable entry:lab;
   mutable exit:lab;
@@ -106,6 +108,10 @@ let locals = Hashtbl.create 14
 let init () =
   graph := L.M.empty;
   Hashtbl.clear locals
+
+let reset () =
+  R.free := 31;
+  L.free := 0
 
 let find_loc = Hashtbl.find locals
 
@@ -251,6 +257,11 @@ let rec instr ret s exit1 dest1 = match s with
   | Ret None -> exit1
   | Ret (Some e) -> expr (R.fresh()) e exit1
 
+let arg_of_formal = function
+  | R.R r -> R.R r
+  | R.F ofs -> R.S ofs
+  | R.S _ -> assert false
+
 let fct {
   retsz=sz;
   fid=f;
@@ -264,10 +275,12 @@ let fct {
   let lcl = Array.init lcl (fun _ -> R.fresh ()) in
   Array.iteri (Hashtbl.add locals) lcl;
   let entry = instr ret i exit exit in
+  let fmls = Array.to_list (Array.sub lcl fml 0) in
   {  
     ident=f;
-    formals=Array.to_list (Array.sub lcl fml 0);
+    formals=fmls;
     locals=lcl;
+    args=List.map arg_of_formal fmls;
     return=ret;
     entry=entry;
     exit=exit;
