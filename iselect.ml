@@ -302,10 +302,10 @@ let mk_move e1 e2 = match e1,e2 with
   | Mloc i,e2 -> Munop (Move i,e2)
   | _ -> assert false
 
+(* We will force spilling *)
 let mk_deref t e = match e with
   | Munop (Addi n,e) -> mk_load t n e
   | Munop (Subi n,e) -> mk_load t (neg n) e
-  | Maddr i -> Mloc i
   | e -> mk_load t zero e
 
 let mk_la e = match e with
