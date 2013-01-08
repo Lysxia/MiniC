@@ -38,8 +38,8 @@ type expr =
   | Mloc    of tident (* lw or use registers, snd:size *)
   | Mla     of string
   | Maddr   of tident (*snd:size*)
-  | Mload   of bool*int*t*expr (* for some size *)
-  | Mstor   of bool*int*expr*t*expr
+  | Mload   of int*t*expr (* for some size *)
+  | Mstor   of int*expr*t*expr
   | Mand    of expr*expr
   | Mor     of expr*expr
   | Mcall   of string*expr list
