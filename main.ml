@@ -71,16 +71,17 @@ let compile file =
       end;
     if !rtl
       then begin
-        let f,_,_ as rt = Rtl.rtl_of_is ist in
+        let f,_,_ = Rtl.rtl_of_is ist in
         if !print then List.iter (Print_rtl.print_fct fstdout) f;
         interrupt 0;
       end;
     if !ertl
       then begin
-        let f,_,_ as rt = Ertl.ertl_of_is ist in
-        List.iter Ltlvlife.build f;
+        let f,_,_ = Ertl.ertl_of_is ist in
         if !print then
-          List.iter (Print_rtl.print_blokfkt fstdout) f;
+          List.iter
+            (fun f ->
+              Print_rtl.print_blokfct fstdout f) f;
         interrupt 0;
       end;
     0

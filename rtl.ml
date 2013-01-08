@@ -13,7 +13,6 @@ module R = struct
   let a0 = R 4
   let gp = R 28
   let sp = R 29
-  let fp = R 30
   let ra = R 31
   let callee_saved = [R 16;R 17;R 18;R 19;R 20;R 21;R 22;R 23]
   let caller_saved = List.map (fun x -> R x)
@@ -22,7 +21,11 @@ module R = struct
     | R a,R b | F a,F b | S a,S b -> compare a b
     | R _,F _ | R _,S _ | F _,S _ -> 1
     | F _,R _ | S _,R _ | S _,F _ -> -1
+  let reset () =
+    free := 31;
   module S = Set.Make(struct
+    type t=mat let compare=compare end)
+  module M = Map.Make(struct
     type t=mat let compare=compare end)
 end
 
@@ -54,12 +57,8 @@ type instr =
   | Binop of reg*b*reg*reg  *lab
   | La    of reg*string     *lab
   | Addr  of reg*reg        *lab
-  | Load  of reg*int*i32*reg*lab
-  | Lw    of reg*i32*reg    *lab
-  | Lb    of reg*i32*reg    *lab
-  | Stor  of reg*reg*int*i32*reg*lab
-  | Sw    of reg*reg*i32*reg    *lab
-  | Sb    of reg*reg*i32*reg    *lab
+  | Load  of reg*bool*int*i32*reg*lab
+  | Stor  of reg*bool*reg*int*i32*reg*lab
   | Jump  of lab
   | Ubch  of ubranch*reg*lab*lab
   | Bbch  of bbranch*reg*reg*lab*lab
@@ -85,7 +84,8 @@ type fct = {
   mutable s_ident:string;
   formals:reg list;
   locals:reg array;
-  args:reg list; (* Registers from the callers perspective *)
+  locsz:int array;
+  args:reg list; (* Registers from a caller's perspective *)
   mutable return:reg; (* location of return *)
   mutable entry:lab;
   mutable exit:lab;
@@ -104,16 +104,17 @@ type fct = {
 (* As was done in class *)
 let graph = ref L.M.empty
 let locals = Hashtbl.create 14
+let to_spill = ref R.S.empty
 
 let init () =
+  to_spill := R.S.empty;
   graph := L.M.empty;
-  Hashtbl.clear locals
-
-let reset () =
-  R.free := 31;
+  Hashtbl.clear locals;
+  R.reset ();
   L.free := 0
 
 let find_loc = Hashtbl.find locals
+let spill ri = to_spill := R.S.add ri !to_spill
 
 let generate i =
   let l = L.fresh() in
@@ -138,28 +139,17 @@ let rec expr r e l =
       expr r1 e1 (expr r2 e2 (generate (Binop (r,o,r1,r2,l))))
   | Mloc i -> generate (Move (r,find_loc i,l))
   | Mla x -> generate (La (r,x,l))
-  | Maddr i -> generate (Addr (r,find_loc i,l))
-  | Mload (sz,ofs,e) ->
+  | Maddr i ->
+      let ri = find_loc i in
+      spill ri;
+      generate (Addr (r,ri,l))
+  | Mload (a,sz,ofs,e) ->
       let r_ = R.fresh () in
-      expr r_ e (generate (Load (r,sz,ofs,r_,l)))
-  | Mlw (ofs,e) ->
-      let r_ = R.fresh () in
-      expr r_ e (generate (Lw (r,ofs,r_,l)))
-  | Mlb (ofs,e) ->
-      let r_ = R.fresh () in
-      expr r_ e (generate (Lb (r,ofs,r_,l)))
-  | Mstor (sz,e1,ofs,e2) ->
+      expr r_ e (generate (Load (r,a,sz,ofs,r_,l)))
+  | Mstor (a,sz,e1,ofs,e2) ->
       let r1 = R.fresh () in
       let r2 = R.fresh () in
-      expr r2 e2 (expr r1 e1 (generate (Stor (r,r1,sz,ofs,r2,l))))
-  | Msw (e1,ofs,e2) ->
-      let r1 = R.fresh () in
-      let r2 = R.fresh () in
-      expr r2 e2 (expr r1 e1 (generate (Sw (r,r1,ofs,r2,l))))
-  | Msb (e1,ofs,e2) ->
-      let r1 = R.fresh () in
-      let r2 = R.fresh () in
-      expr r2 e2 (expr r1 e1 (generate (Sb (r,r1,ofs,r2,l))))
+      expr r2 e2 (expr r1 e1 (generate (Stor (r,a,r1,sz,ofs,r2,l))))
   | Mand _
   | Mor _ ->
       condition e (generate (Const (r,one,l)))
@@ -275,16 +265,17 @@ let fct {
   let lcl = Array.init lcl (fun _ -> R.fresh ()) in
   Array.iteri (Hashtbl.add locals) lcl;
   let entry = instr ret i exit exit in
-  let fmls = Array.to_list (Array.sub lcl fml 0) in
+  let fmls = Array.to_list (Array.sub lcl 0 fml) in
   {  
     ident=f;
     formals=fmls;
     locals=lcl;
+    locsz=a;
     args=List.map arg_of_formal fmls;
     return=ret;
     entry=entry;
     exit=exit;
-    body = !graph;
+    body= !graph;
     (* putting some dummy values *)
     cr_saved=R.caller_saved;
     ce_saved=[];
@@ -294,3 +285,9 @@ let fct {
 let rtl_of_is (f,v,data) =
   let f = List.map fct f in
   f,v,data
+
+(**)
+let reset () =
+  Iselect.reset ();
+  init ();
+

@@ -35,15 +35,11 @@ type expr =
   | Mconst  of t (* li *)
   | Munop   of munop*expr
   | Mbinop  of mbinop*expr*expr
-  | Mloc    of tident (* lw or use registers *)
+  | Mloc    of tident (* lw or use registers, snd:size *)
   | Mla     of string
-  | Maddr   of tident
-  | Mload   of int*t*expr (* for some size *)
-  | Mlw     of t*expr
-  | Mlb     of t*expr
-  | Mstor   of int*expr*t*expr
-  | Msw     of expr*t*expr
-  | Msb     of expr*t*expr
+  | Maddr   of tident (*snd:size*)
+  | Mload   of bool*int*t*expr (* for some size *)
+  | Mstor   of bool*int*expr*t*expr
   | Mand    of expr*expr
   | Mor     of expr*expr
   | Mcall   of string*expr list
@@ -85,10 +81,6 @@ let constr = Hashtbl.create 17
 
 let data:(int*string) list ref = ref []
 
-let reset () =
-  Hashtbl.clear constr;
-  data := []
-
 let aligned = function
   | C -> false
   | I | P _ -> true
@@ -117,7 +109,7 @@ let rec pure e = match e with
   | Mand (e1,e2)
   | Mor (e1,e2) -> pure e1 && pure e2
   | Mconst _ | Mloc _ | Mla _ | Maddr _ -> true
-  | Mlw _ | Mlb _ | Mload _ | Msw _ | Msb _ | Mstor _
+  | Mload _ | Mstor _
   | Munop (Move _,_) -> false
   | Munop (_,e) -> pure e
   | Mcall _ -> false
@@ -228,7 +220,7 @@ and mk_rem e1 e2 = match e1,e2 with
   | e1,e2 -> Mbinop (Rem, e1, e2)
 
 (* bool op *)
-let rec mk_not = function
+let rec mk_not e = match e with
   | Mconst n ->
       if n=zero
         then Mconst one
@@ -302,39 +294,22 @@ and mk_sne e1 e2 = match mk_sub e1 e2 with
   | Mbinop (Sub,e1,e2) -> Mbinop (Sne,e1,e2)
   | _ -> Mbinop (Sne,e1,e2)
 
-let mk_load t_size ofs e =
-  if t_size = 4
-    then begin
-      assert (logand ofs (of_int 3) = zero);
-      Mlw (ofs,e)
-    end
-  else if t_size=1 then Mlb (ofs,e)
-  else Mload (t_size,ofs,e)
-
-(*
-let mk_stor t_size e1 n e2 =
-  if t_size = 4 then Msw (e,n,e)
-  else if t_size = 1 then Msb (n,e)
-  else Mstor (t_size,n,e)
-*)
+let mk_load t ofs e =
+  Mload (aligned t,sizeof t,ofs,e)
 
 let mk_move e1 e2 = match e1,e2 with
-  | Mlw (ofs,e1),e2 -> Msw (e2,ofs,e1)
-  | Mlb (ofs,e1),e2 -> Msb (e2,ofs,e1)
-  | Mload (sz,ofs,e1),e2 -> Mstor (sz,e2,ofs,e1)
+  | Mload (a,s,ofs,e1),e2 -> Mstor (a,s,e2,ofs,e1)
   | Mloc i,e2 -> Munop (Move i,e2)
   | _ -> assert false
 
-let mk_deref t_size = function
-  | Munop (Addi n,e) -> mk_load t_size n e
-  | Munop (Subi n,e) -> mk_load t_size (neg n) e
+let mk_deref t e = match e with
+  | Munop (Addi n,e) -> mk_load t n e
+  | Munop (Subi n,e) -> mk_load t (neg n) e
   | Maddr i -> Mloc i
-  | e -> mk_load t_size zero e
+  | e -> mk_load t zero e
 
-let mk_la = function
-  | Mlw (n,e)
-  | Mlb (n,e)
-  | Mload (_,n,e) -> mk_add (Mconst n) e
+let mk_la e = match e with
+  | Mload (_,_,n,e) -> mk_add (Mconst n) e
   | Mloc i -> Maddr i
   | _ -> assert false (* Not an l-value *)
 
@@ -345,17 +320,33 @@ let mk_string s =
   data := (!free_string,s)::!data;
   "string"^string_of_int !free_string
 
+let mk_t_add t1 t2 e1 e2 = match t1,t2 with
+  | P (n,t) as p,_ ->
+      let sz = if n=1 then sizeof t else sizeof p in
+      mk_add e1 (mk_mul (Mconst (of_int sz)) e2)
+  | _,(P (n,t) as p) -> 
+      let sz = if n=1 then sizeof t else sizeof p in
+      mk_add e2 (mk_mul (Mconst (of_int sz)) e1)
+  | _,_ -> mk_add e1 e2
 
-let mk_unop sz u x = match u with
-  | Ast.Incrp -> mk_move x (Munop (Addi one,x))
-  | Ast.Decrp -> mk_move x (Munop (Subi one,x))
-  | Ast.Incrs -> mk_sub (mk_move x (mk_add x (Mconst one)))
-                        (Mconst one)
-  | Ast.Decrs -> mk_add (mk_move x (mk_sub x (Mconst one)))
-                        (Mconst one)
+let mk_t_sub t1 t2 e1 e2 = match t1,t2 with
+  | P _,P _ -> mk_sub e1 e2
+  | (P (n,t) as p),_ ->
+      let sz = if n=1 then sizeof t else sizeof p in
+      mk_sub e1 (mk_mul (Mconst (of_int sz)) e2)
+  | _ -> mk_sub e1 e2
+
+let one = Mconst one
+
+let mk_unop t u x =
+  match u with
+  | Ast.Incrp -> mk_move x (mk_t_add t I x one)
+  | Ast.Decrp -> mk_move x (mk_t_sub t I x one)
+  | Ast.Incrs -> mk_t_sub t I (mk_move x (mk_t_add t I x one)) one
+  | Ast.Decrs -> mk_t_add t I (mk_move x (mk_t_sub t I x one)) one
   (* i++ ~ (i=i+1)-1*)
   | Ast.Not -> mk_not x
-  | Ast.Star -> mk_deref sz x
+  | Ast.Star -> mk_deref t x
   | Ast.Address -> mk_la x
   | Ast.Uminus -> mk_neg x
   | Ast.Uplus -> x
@@ -375,46 +366,24 @@ let mk_binop o e1 e2 = match o with
   | Ast.Add
   | Ast.Sub -> assert false
 
-let rec isexpr {tdesc=e ; t=tt} = match e with
+let rec isexpr {tdesc=e;t=t} = match e with
   | TCi n -> Mconst n
   | TLoc i -> Mloc i
-  | TGlo x -> mk_load (sizeof tt) zero (Mla x)
-  | TAssign (e1,e2) ->
-    mk_move (isexpr e1) (isexpr e2)
+  | TGlo x -> mk_load t zero (Mla x)
+  | TAssign (e1,e2) -> mk_move (isexpr e1) (isexpr e2)
   | TCall (f,l) -> Mcall (f,List.map isexpr l)
-  | TUnop (u,e) -> mk_unop (sizeof tt) u (isexpr e)
-  | TBinop (Ast.Add,e1,e2) ->
-      begin match e1.t,e2.t with
-      | P (n,t) as p,_ ->
-          let sz = if n=1 then sizeof t else sizeof p in
-          mk_add
-          (isexpr e1)
-          (mk_mul (Mconst (of_int sz)) (isexpr e2))
-      | _,(P (n,t) as p) -> 
-          let sz = if n=1 then sizeof t else sizeof p in
-          mk_add
-          (isexpr e2)
-          (mk_mul (Mconst (of_int sz)) (isexpr e1))
-      | _,_ -> mk_add (isexpr e1) (isexpr e2)
-      end
-  | TBinop (Ast.Sub,e1,e2) ->
-      begin match e1.t with
-      | P (n,t) as p ->
-          let sz = if n=1 then sizeof t else sizeof p in
-          mk_sub
-          (isexpr e1)
-          (mk_mul (Mconst (of_int sz)) (isexpr e2))
-      | _ -> mk_sub (isexpr e1) (isexpr e2)
-      end
+  | TUnop (u,e) -> mk_unop e.t u (isexpr e)
+  | TBinop (Ast.Add,e1,e2) -> mk_t_add e1.t e2.t (isexpr e1) (isexpr e2)
+  | TBinop (Ast.Sub,e1,e2) -> mk_t_sub e1.t e2.t (isexpr e1) (isexpr e2)
   | TBinop (o,e1,e2) -> mk_binop o (isexpr e1) (isexpr e2)
   | TSizeof t -> Mconst (of_int (sizeof t))
   | TCs s -> Mla (mk_string s)
   | TDot (e,i) -> match e.t with
     | S j -> let ofs = ofs j i in
-        mk_deref (sizeof tt)
+        mk_deref t
           (mk_add (mk_la (isexpr e))
           (Mconst ofs))
-    | U j -> mk_deref (sizeof tt) (mk_la (isexpr e))
+    | U j -> mk_deref t (mk_la (isexpr e))
     | _ -> assert false
 
 let rec isinstr t0 = function
@@ -489,3 +458,10 @@ let file (c,f,v) =
   List.iter isconstr c;
   let f,v = List.map isfct f,gvars v in
   f,v,!data
+
+(**)
+let reset () =
+  Typing.reset ();
+  Hashtbl.clear constr;
+  data := []
+

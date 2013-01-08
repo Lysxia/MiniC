@@ -14,9 +14,6 @@ open Rtl
 
 let f_map = ref Smap.empty
 
-let reset () =
-  f_map := Smap.empty
-
 let find f =
   try
     Smap.find f !f_map
@@ -25,12 +22,13 @@ let find f =
 
 let rec set_arg fml_l arg_l l = match fml_l,arg_l with
   | [],[] -> l
-  | f::fl,a::al -> set_arg fl al (generate (
+  | f::fl,a::al -> set_arg fl al (generate (Move ((
       match f with
-        | R.R _ -> Move (f,a,l)
-        | R.F ofs -> Move (R.S ofs,a,l)
-        | R.S _ -> assert false))
-  | [],_ | _,[] -> assert false
+        | R.R _ -> f
+        | R.F ofs -> R.S ofs
+        | R.S _ -> assert false),a,l)))
+  | [],_ -> Printf.printf "%d%!" (List.length arg_l);
+  assert false | _,[] -> assert false
 
 let rec set_savers savers ce_saved l = match ce_saved with
   | [] -> l
@@ -38,12 +36,8 @@ let rec set_savers savers ce_saved l = match ce_saved with
       Move (r,(List.assoc s savers),l)))
 
 let instr savers exit e = match e with
-  | Const _
-  | Move _ | Unop _ | Binop _
-  | La _ | Addr _
-  | Load _ | Lw _ | Lb _
-  | Stor _ | Sw _ | Sb _
-  | Jump _ | Ubch _ | Bbch _ -> e
+  | Const _ | Move _ | Unop _ | Binop _ | La _ | Addr _
+  | Load _ | Stor _ | Jump _ | Ubch _ | Bbch _ -> e
   | Call (r,f,arg,l) ->
       if f="sbrk"
         then Move (R.a0,List.hd arg,
@@ -108,3 +102,8 @@ let ertl_of_isf f =
 let ertl_of_is (f,v,d) =
   let f = List.map ertl_of_isf f in
   f,v,d
+
+(**)
+let reset () =
+  Rtl.reset ();
+  f_map := Smap.empty

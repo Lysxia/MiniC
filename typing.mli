@@ -65,3 +65,5 @@ type env
 val type_expr  : Ast.expr  -> texpr
 val type_instr : Ast.instr -> tinstr*env
 val type_prog  : Ast.file  -> tfile
+
+val reset : unit -> unit

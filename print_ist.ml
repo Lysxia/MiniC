@@ -55,31 +55,13 @@ let rec print_expr h = function
       Format.fprintf h "&%d" i
   | Mla s ->
       Format.fprintf h "%s" s
-  | Mload (sz,ofs,addr) ->
+  | Mload (_,sz,ofs,addr) ->
       Format.fprintf h "(LOAD_%d %s %a)"
         sz (to_string ofs)
         print_expr addr
-  | Mlb (ofs,addr) ->
-      Format.fprintf h "(lb %s %a)"
-        (to_string ofs)
-        print_expr addr
-  | Mlw (ofs,addr) ->
-      Format.fprintf h "(lw %s %a)"
-        (to_string ofs)
-        print_expr addr
-  | Mstor (sz,e,ofs,addr) ->
+  | Mstor (_,sz,e,ofs,addr) ->
       Format.fprintf h "(STOR_%d %a %s %a)"
         sz
-        print_expr e
-        (to_string ofs)
-        print_expr addr
-  | Msb (e,ofs,addr) ->
-      Format.fprintf h "(sb %a %s %a)"
-        print_expr e
-        (to_string ofs)
-        print_expr addr
-  | Msw (e,ofs,addr) ->
-      Format.fprintf h "(sw %a %s %a)"
         print_expr e
         (to_string ofs)
         print_expr addr

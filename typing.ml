@@ -554,6 +554,8 @@ let type_prog { desc=ast ; loc=loc } =
       (Smap.singleton "sbrk" (P(1,V),[I])) }
     [] [] ast
   
-(*****)
+(**)
+let reset () =
+  Hashtbl.clear constr_of_tid
 
 (*___\o/______________/[_________S_H_A_R_K___A_T_T_A_C_K___!___*)
