@@ -74,7 +74,7 @@ type instr =
 
 type graph = instr L.M.t
 
-(* As is stated below, we do final call, and for efficiency we
+(* we optimiwze final calls, and for efficiency we
  * will use two start labels in functions which need callee-saved
  * registers, so that we try not to store them twice,
  * we also keep track of actually USED caller_saved registers
@@ -84,7 +84,8 @@ type fct = {
   mutable s_ident:string;
   formals:reg list;
   locals:reg array;
-  locsz:int array;
+  to_spill:R.S.t;
+  mutable locsz:int R.M.t;
   args:reg list; (* Registers from a caller's perspective *)
   mutable return:reg; (* location of return *)
   mutable entry:lab;
@@ -98,8 +99,6 @@ type fct = {
 }
 
 (***********************************************)
-(* WE IMPLEMENT FINAL CALL FOR ANY FUNCTION *)
-
 
 (* As was done in class *)
 let graph = ref L.M.empty
@@ -272,6 +271,7 @@ let fct {
     locals=lcl;
     locsz=a;
     args=List.map arg_of_formal fmls;
+    to_spill= !to_spill;
     return=ret;
     entry=entry;
     exit=exit;
