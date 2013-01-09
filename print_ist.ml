@@ -49,8 +49,6 @@ let rec print_expr h = function
         (binop_string o)
         print_expr e1
         print_expr e2
-  | Mloc i ->
-      Format.fprintf h "x%d" i
   | Maddr i ->
       Format.fprintf h "&%d" i
   | Mla s ->

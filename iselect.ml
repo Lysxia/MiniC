@@ -17,11 +17,12 @@ type munop =
   | Remi of t
   | Addi of t | Muli of t | Subi of t
   | Slti of t | Seqi of t | Snei of t | Sgti of t
-  | Andi of t | Sgtiu of t
+  | Andi of t | Sltiu of t
   | Sll of int
 
 type mbinop =
   | Add | Div | Mul | Sub | Rem | Seq | Sne | Slt | Sle
+  | Sltu
   (* slt, sltu, sltiu, slti are basic instructions,
    * others are pseudo-instruction
    * (and seq is not optimally translated)
@@ -35,7 +36,6 @@ type expr =
   | Mconst  of t (* li *)
   | Munop   of munop*expr
   | Mbinop  of mbinop*expr*expr
-  | Mloc    of tident (* lw or use registers, snd:size *)
   | Mla     of string
   | Maddr   of tident (*snd:size*)
   | Mload   of bool*int*t*expr (* for some size *)
@@ -60,7 +60,7 @@ type fct = {
   fid:string;
   formals:int;
   locals:int;
-  locsz:int array;
+  locsz:(bool*int) array;
   body:instr
 }
 
@@ -80,6 +80,8 @@ let log2 x =
 let constr = Hashtbl.create 17
 
 let data:(int*string) list ref = ref []
+
+let f_map:fct Smap.t ref= ref Smap.empty
 
 let aligned = function
   | C -> false
@@ -108,7 +110,7 @@ let rec pure e = match e with
   | Mbinop (_,e1,e2)
   | Mand (e1,e2)
   | Mor (e1,e2) -> pure e1 && pure e2
-  | Mconst _ | Mloc _ | Mla _ | Maddr _ -> true
+  | Mconst _ | Mla _ | Maddr _ -> true
   | Mload _ | Mstor _
   | Munop (Move _,_) -> false
   | Munop (_,e) -> pure e
@@ -299,7 +301,6 @@ let mk_load t ofs e =
 
 let mk_move e1 e2 = match e1,e2 with
   | Mload (a,s,ofs,e1),e2 -> Mstor (a,s,e2,ofs,e1)
-  | Mloc i,e2 -> Munop (Move i,e2)
   | _ -> assert false
 
 (* We will force spilling *)
@@ -310,7 +311,6 @@ let mk_deref t e = match e with
 
 let mk_la e = match e with
   | Mload (_,_,n,e) -> mk_add (Mconst n) e
-  | Mloc i -> Maddr i
   | _ -> assert false (* Not an l-value *)
 
 let free_string = ref 0
@@ -368,7 +368,7 @@ let mk_binop o e1 e2 = match o with
 
 let rec isexpr {tdesc=e;t=t} = match e with
   | TCi n -> Mconst n
-  | TLoc i -> Mloc i
+  | TLoc i -> mk_deref t (Maddr i)
   | TGlo x -> mk_load t zero (Mla x)
   | TAssign (e1,e2) -> mk_move (isexpr e1) (isexpr e2)
   | TCall (f,l) -> Mcall (sizeof t,f,List.map isexpr l)
@@ -414,12 +414,15 @@ let isfct {
     fid=f;
     formals=argc;
     locals=Array.length lcl;
-    locsz=Array.map sizeof lcl;
+    locsz=Array.map (fun x->aligned x,sizeof x) lcl;
     body=isinstr t i;
   }
 
 let gvars vl =
   List.map (fun (t,v) -> (sizeof t,v)) vl
+
+(* Next multiple of 4 *)
+let round_4 i = (i+3)/4*4
 
 (* We only need types lengths, typing guarantees
  * we know the data length *)
@@ -438,7 +441,7 @@ let isconstr = function
         f_loc.(i) <- of_int (!sz-4);
       done;
       if !align
-        then sz := (!sz+3)/4*4;
+        then sz := round_4 !sz;
       Hashtbl.add constr i (!sz,!align,f_loc)
   | U i,u ->
       let s_max = ref 0 in
