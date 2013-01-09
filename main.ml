@@ -13,8 +13,6 @@ let batch = ref false
 let output = ref true
 let print = ref false
 let is = ref false
-let rtl = ref false
-let ertl = ref false
 
 let usage = Printf.sprintf
   "Usage : %s program.c [-parse-only] [-type-only]"
@@ -33,10 +31,6 @@ let speclist = [
     "Print compiled tree";
   "-is", Arg.Set is,
     "Stop after instruction selection";
-  "-rtl", Arg.Set rtl,
-    "Stop at Register Transfer Language";
-  "-ertl", Arg.Set ertl,
-    "Stop at ERTL"
   ]
 
 let args = ref []
@@ -44,10 +38,7 @@ let args = ref []
 let collect arg = args := arg :: !args
 
 let reset () =
-  Iselect.reset ();
-  Rtl.reset ();
-  Ertl.reset ()
-
+  Iselect.reset ()
 
 let compile file =
   let h = open_in file in
@@ -67,21 +58,6 @@ let compile file =
     if !is
       then begin
         if !print then Print_ist.print_file fstdout ist;
-        interrupt 0;
-      end;
-    if !rtl
-      then begin
-        let f,_,_ = Rtl.rtl_of_is ist in
-        if !print then List.iter (Print_rtl.print_fct fstdout) f;
-        interrupt 0;
-      end;
-    if !ertl
-      then begin
-        let f,_,_ = Ertl.ertl_of_is ist in
-        if !print then
-          List.iter
-            (fun f ->
-              Print_rtl.print_blokfct fstdout f) f;
         interrupt 0;
       end;
     0

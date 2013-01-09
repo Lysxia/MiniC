@@ -73,10 +73,9 @@ let rec print_expr h = function
       Format.fprintf h "(%a || %a)"
         print_expr e1
         print_expr e2
-  | Mcall (f,l) ->
-      Format.fprintf h "%s(%a)"
-        f
-        print_elist l
+  | Mcall (sz,f,l) ->
+      Format.fprintf h "%s:%d(%a)"
+        f sz print_elist l
 
 and print_elist h = function
   | [] -> ()

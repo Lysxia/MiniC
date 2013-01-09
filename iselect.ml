@@ -17,7 +17,7 @@ type munop =
   | Remi of t
   | Addi of t | Muli of t | Subi of t
   | Slti of t | Seqi of t | Snei of t | Sgti of t
-  | Andi of t
+  | Andi of t | Sgtiu of t
   | Sll of int
 
 type mbinop =
@@ -38,11 +38,11 @@ type expr =
   | Mloc    of tident (* lw or use registers, snd:size *)
   | Mla     of string
   | Maddr   of tident (*snd:size*)
-  | Mload   of int*t*expr (* for some size *)
-  | Mstor   of int*expr*t*expr
+  | Mload   of bool*int*t*expr (* for some size *)
+  | Mstor   of bool*int*expr*t*expr
   | Mand    of expr*expr
   | Mor     of expr*expr
-  | Mcall   of string*expr list
+  | Mcall   of int*string*expr list
 
 type instr =
   | Nop
@@ -371,7 +371,7 @@ let rec isexpr {tdesc=e;t=t} = match e with
   | TLoc i -> Mloc i
   | TGlo x -> mk_load t zero (Mla x)
   | TAssign (e1,e2) -> mk_move (isexpr e1) (isexpr e2)
-  | TCall (f,l) -> Mcall (f,List.map isexpr l)
+  | TCall (f,l) -> Mcall (sizeof t,f,List.map isexpr l)
   | TUnop (u,e) -> mk_unop e.t u (isexpr e)
   | TBinop (Ast.Add,e1,e2) -> mk_t_add e1.t e2.t (isexpr e1) (isexpr e2)
   | TBinop (Ast.Sub,e1,e2) -> mk_t_sub e1.t e2.t (isexpr e1) (isexpr e2)
