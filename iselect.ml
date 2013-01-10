@@ -22,7 +22,7 @@ type munop =
 
 type mbinop =
   | Add | Div | Mul | Sub | Rem | Seq | Sne | Slt | Sle
-  | Sltu
+  | Sltu | Or
   (* slt, sltu, sltiu, slti are basic instructions,
    * others are pseudo-instruction
    * (and seq is not optimally translated)

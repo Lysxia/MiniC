@@ -1,5 +1,6 @@
 (** Mini-C Compiler **)
 (* Li-yao Xia *)
+open Mips
 
 exception Interrupt of int
 

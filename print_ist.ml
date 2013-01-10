@@ -18,6 +18,7 @@ let rec unop_string = function
       Format.sprintf "rem_i(%s)" (to_string n)
   | Slti n ->
       Format.sprintf "slti(%s)" (to_string n)
+  | Sltiu n -> Format.sprintf "sltiu(%s)" (to_string n)
   | Sgti n ->
       Format.sprintf "sgti(%s)" (to_string n)
   | Seqi n ->
@@ -37,6 +38,7 @@ let rec binop_string = function
   | Sle -> "sle"
   | Seq -> "seq"
   | Sne -> "Sne"
+  | Sltu -> "sltu"
 
 
 let rec print_expr h = function
@@ -112,7 +114,7 @@ let rec print_instr h = function
 
 let print_comma_sep_array h n a =
   for i = 0 to n-1 do
-    Format.fprintf h "%d" a.(i);
+    Format.fprintf h "%d" (snd a.(i));
     if i<n-1 then
       Format.fprintf h ","
   done
