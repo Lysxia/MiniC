@@ -3,7 +3,6 @@ open Int32
 
 let rec unop_string = function
   | Neg -> "neg"
-  | Move i -> Format.sprintf "%d=" i
   | Andi n ->
       Format.sprintf "andi(%s)" (to_string n)
   | Addi n ->
@@ -39,6 +38,7 @@ let rec binop_string = function
   | Seq -> "seq"
   | Sne -> "Sne"
   | Sltu -> "sltu"
+  | Or -> "or"
 
 
 let rec print_expr h = function

@@ -25,11 +25,15 @@ type unop =
   | Incrp | Decrp | Incrs | Decrs (* Plus-plus/Minus-minus pre/suffix *)
   | Address | Not | Uminus | Uplus | Star
 
+type str =
+  | Str of string
+  | Ascii of int array
+
 type expr = edesc loc
 
 and edesc =
   | Cint    of Int32.t
-  | Cstring of string
+  | Cstring of str
   | Ident   of ident
   | Dot     of expr*ident
   | Assign  of expr*expr

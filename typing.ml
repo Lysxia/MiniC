@@ -37,7 +37,7 @@ type texpr = tedesc typed
 
 and tedesc =
   | TCi of Int32.t
-  | TCs of string
+  | TCs of str
   | TLoc of tident
   | TGlo of tname
   | TDot of texpr*tident

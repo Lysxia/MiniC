@@ -12,7 +12,6 @@ module Iset = Set.Make(struct type t=int let compare=Pervasives.compare end)
 
 type munop =
   | Neg
-  | Move of int
   | Divi of t (* WRITTEN div IN MIPS *)
   | Remi of t
   | Addi of t | Muli of t | Subi of t
@@ -57,6 +56,7 @@ type vdec = int*string
 
 type fct = {
   retsz:int;
+  retal:bool;
   fid:string;
   formals:int;
   locals:int;
@@ -79,9 +79,7 @@ let log2 x =
 
 let constr = Hashtbl.create 17
 
-let data:(int*string) list ref = ref []
-
-let f_map:fct Smap.t ref= ref Smap.empty
+let data:(int*Ast.str) list ref = ref []
 
 let aligned = function
   | C -> false
@@ -411,6 +409,7 @@ let isfct {
 } = 
   {
     retsz=sizeof t;
+    retal=aligned t;
     fid=f;
     formals=argc;
     locals=Array.length lcl;

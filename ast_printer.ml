@@ -20,7 +20,7 @@ let rec print_elist h = function
 
 and print_texpr h {tdesc=e ; t=t} = match e with
   | TCi i -> Format.fprintf h "%s" (Int32.to_string i);
-  | TCs s -> Format.fprintf h "\"%s\"" s
+  | TCs s -> Format.fprintf h "\"some_string\""
   | TLoc i -> print_tident h i
   | TGlo n -> print_tname h n
   | TDot (e,i) ->

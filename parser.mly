@@ -5,6 +5,8 @@
   open Lexing
   open Ast
 
+  exception Not_printable
+
   let loc startpos endpos =
     { start_p=startpos ; end_p=endpos }
 
@@ -13,6 +15,17 @@
 
   let vdec_of_var_list t { desc=n,x ; loc=loc } =
     { desc=mk_pointer t n,x ; loc=loc }
+
+  let mk_str s =
+    try
+      for i = 0 to String.length s -1 do
+        if int_of_char s.[i] < 32 then
+          raise Not_printable
+      done;
+      Str s
+    with
+      | Not_printable ->
+          Ascii (Array.init (String.length s) (fun i->int_of_char s.[i]))
 
 %}
 
@@ -107,7 +120,7 @@ expr:
 
 edesc:
   | CST 			{ Cint $1 }
-  | STR 			{ Cstring $1 }
+  | STR 			{ Cstring (mk_str $1) }
   | IDENT			{ Ident $1 }
   | expr DOT IDENT		{ Dot ($1,$3) }
   | expr ARROW IDENT            {

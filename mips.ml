@@ -4,6 +4,7 @@ Calling convention :
   * or on the stack : Values with size > 4 go on the stack at 0($fp)
   * Others go in $v0 *)
 (* All local variables are stored on the stack too *)
+(* Intermediate results are put on stack *)
 
 open Int32
 open Iselect
@@ -37,16 +38,16 @@ type text =
   | Label of label
   | Concat of text*text
 
-type data =
-  | Asciiz of label*string
+let data = (string*Ast.str list)
 
 type fct =
   {
     ident:string;
-    fmlpos:int list;
-    fmlsz:int list;
-    fmlal:bool list;
-    outsz:int
+    argpos:int list;
+    argsz:int list;
+    argal:bool list;
+    rsz:int;
+    ral:bool;
   }
 
 let (++) c1 c2 = match c1,c2 with
@@ -62,7 +63,7 @@ let four = of_int 4
 
 let f_map:fct Smap.t ref = ref Smap.empty
 
-(**)
+(* Load ofs(reg) into $a0 or stack when s>4 *)
 let load a s ofs reg sp =
   if a
     then
@@ -96,6 +97,8 @@ let load a s ofs reg sp =
         !ls
     end
 
+(* Store last calculated value which is saved
+ *  in $a0 or in stack (if s > 4) in ofs($reg) *)
 let store a s ofs reg sp =
   if s=4
     then
@@ -140,62 +143,63 @@ let branching brch_instr l1 l2 b1 b2 =
 
 (* e1 and e2 are int or char typed expressions*)
 (* stores the outputs in A0 and A1 *)
-let rec byte_pair arg_pos sp e1 e2 =
-  expr arg_pos sp e1
+let rec byte_pair argpos sp e1 e2 =
+  expr argpos sp e1
   ++ store true 4 sp SP sp
-  ++ expr arg_pos (sp-4) e2
+  ++ expr argpos (sp-4) e2
   ++ Move (A1,A0)
   ++ load true 4 sp SP sp
 
 (* convert expr to a sequence of mips instructions *)
-(* arg_pos gives the offset of each argument relatively to $fp
+(* argpos gives the offset of each argument relatively to $fp
  * Result is put on stack if its size is > 4, $a0 otherwise *)
-and expr arg_pos sp =
+and expr argpos sp =
   let store_args f el =
-    let f = Smap.find f !f_map in
     let rec store_args sp el pos al sz = match el,pos,al,sz with
       | [],_,_,_ -> Nop
       | e::el,p::pos,a::al,s::sz ->
-          (expr arg_pos sp e)
+          (expr argpos sp e)
           ++(if s>4 then Nop else store a s sp SP sp)
           ++store_args (sp-s) el pos al sz
       | _,_,_,_ -> assert false
     in
-    store_args 0 el f.fmlpos f.fmlal f.fmlsz
+    store_args 0 el f.argpos f.argal f.argsz
   in function
   | Mconst n -> Li (A0,n)
   | Mla s -> La (A0,s)
   (*| Mload (a,s,n,Maddr i) ->
-    let ofs = add n (of_int arg_pos.(i)) in
+    let ofs = add n (of_int argpos.(i)) in
     let sp = sp - ((s+3)/4)*4 in
     load a s ofs FP sp*)
   | Mload (a,s,n,e) ->
-      expr arg_pos sp e
+      expr argpos sp e
       ++ Move (A1,A0)
       ++ load a s (to_int n) A1 (sp-s)
   | Mstor (a,s,e,n,f) ->
-    expr arg_pos sp f
+    expr argpos sp f
     ++ Sw (A0,sp,SP)
-    ++ expr arg_pos (sp-4) e
+    ++ expr argpos (sp-4) e
     ++ Lw (A2,sp,SP)
     ++ store a s (to_int n) A1 (sp-s)
-  | Maddr i -> Unop (A0,Addi (of_int arg_pos.(i)),FP)
+  | Maddr i -> Unop (A0,Addi (of_int argpos.(i)),FP)
   | Mcall (s,f,el) ->
+      let f = Smap.find f !f_map in
+      let sp = (sp-3)/4*4 in
       Unop (SP,Addi (of_int sp),SP)
       ++ store_args f el
-      ++ Jal f
-      ++ Unop (SP,Subi (of_int sp),SP)
-  | Munop (u,e) -> (expr arg_pos sp e)++Unop(A0,u,A0)
+      ++ Jal f.ident
+      ++ Unop (SP,Subi (of_int sp),FP)
+  | Munop (u,e) -> (expr argpos sp e)++Unop(A0,u,A0)
   | Mbinop (o,e1,e2) ->
-      byte_pair arg_pos sp e1 e2
+      byte_pair argpos sp e1 e2
       ++ Binop (A0,o,A0,A1)
   | Mand (e1,e2) ->
-      condition arg_pos sp e1
-        (expr arg_pos sp e2 ++ Binop (A0,Sltu,ZERO,A0))
+      condition argpos sp e1
+        (expr argpos sp e2 ++ Binop (A0,Sltu,ZERO,A0))
         (Binop (A0,Sltu,ZERO,A0))
   | Mor (e1,e2) ->
-      condition arg_pos sp e1 (Binop (A0,Sltu,ZERO,A0))
-        (expr arg_pos sp e2 ++ (Binop (A0,Sltu,ZERO,A0)))
+      condition argpos sp e1 (Binop (A0,Sltu,ZERO,A0))
+        (expr argpos sp e2 ++ (Binop (A0,Sltu,ZERO,A0)))
 
 and condition arg sp e b1 b2 = match e with
   | Mconst n -> if n=zero then b2 else b1
@@ -212,56 +216,146 @@ and condition arg sp e b1 b2 = match e with
       let l2 = l1^"_" in
       branching (branch arg sp e l2) l1 l2 b1 b2
 
-and branch arg_pos sp e l = match e with
+and branch argpos sp e l = match e with
+  | Mconst n -> if n=zero then Nop else J l
+  | Mand (e1,e2) ->
+      let l0 = "and_fail"^fresh() in
+      expr argpos sp e1
+      ++ Bbch (Beq,A0,ZERO,l0)
+      ++ expr argpos sp e2
+      ++ Bbch(Bne,A0,ZERO,l)
+      ++ Label l0
+  | Mor (e1,e2) ->
+      expr argpos sp e1
+      ++ Bbch (Bne,A0,ZERO,l)
+      ++ expr argpos sp e2
+      ++ Bbch (Bne,A0,ZERO,l)
+  | Munop (Neg,e) ->
+      branch argpos sp e l
+  | Munop (Muli zero,e) ->
+      expr argpos sp e ++ J l
   | Munop (Slti n,e) ->
-      expr arg_pos sp e
+      expr argpos sp e
       ++ (if n = zero
             then Ubch (Bltz,A0,l)
             else Ubch (Blti n,A0,l))
   | Munop (Sgti n,e) ->
-      expr arg_pos sp e
+      expr argpos sp e
       ++ (if n = zero
             then Ubch (Bgtz,A0,l)
             else Ubch (Bgti n,A0,l))
   | Munop (Seqi n,e) ->
-      expr arg_pos sp e
+      expr argpos sp e
       ++ (if n = zero
             then Ubch (Beqz,A0,l)
             else Ubch (Beqi n,A0,l))
   | Munop (Snei n,e) ->
-      expr arg_pos sp e
+      expr argpos sp e
       ++ (if n = zero
             then Ubch (Bnez,A0,l)
             else Ubch (Bnei n,A0,l))
   | Mbinop (Seq,e1,e2) ->
-      byte_pair arg_pos sp e1 e2
+      byte_pair argpos sp e1 e2
       ++ Bbch (Beq,A0,A1,l)
   | Mbinop (Sne,e1,e2) ->
-      byte_pair arg_pos sp e1 e2
+      byte_pair argpos sp e1 e2
       ++ Bbch (Bne,A0,A1,l)
   | Mbinop (Slt,e1,e2) ->
-      byte_pair arg_pos sp e1 e2
+      byte_pair argpos sp e1 e2
       ++ Bbch (Blt,A0,A1,l)
   | Mbinop (Sle,e1,e2) ->
-      byte_pair arg_pos sp e1 e2
+      byte_pair argpos sp e1 e2
       ++ Bbch (Ble,A0,A1,l)
   | e ->
-      expr arg_pos sp e
+      expr argpos sp e
       ++ Ubch (Beqz,A0,l)
 
-      (*
-let rec instr arg quit sp = function
+let rec instr arg ((set_return,exit) as quit) = function
   | Iselect.Nop -> Nop
-  | Expr e -> expr arg sp e
+  | Expr e -> expr arg 0 e
   | If (e,i1,i2) ->
-      condition arg sp e
-        (instr arg quit sp i1) (instr arg sp i2)
+      condition arg 0 e
+        (instr arg quit i1) (instr arg quit i2)
   | While (e,i) ->
       let l = "while"^fresh () in
       let l_ = l^"_" in
       J l_
       ++ Label l
-      ++ instr arg_pos quit sp i
+      ++ instr arg quit i
       ++ Label l_
-      ++ branch arg_pos l
-  | *)
+      ++ branch arg 0 e l
+  | For (init,cond,inc,i) ->
+      let l = "for"^fresh () in
+      let l_ = l^"_" in
+      List.fold_left (++) Nop (List.map (expr arg 0) init)
+      ++ J l_
+      ++ Label l
+      ++ instr arg quit i
+      ++ List.fold_left (++) Nop (List.map (expr arg 0) inc)
+      ++ Label l_
+      ++ branch arg 0 cond l
+  | Bloc i ->
+      List.fold_left (++) Nop (List.map (instr arg quit) i)
+  | Ret None -> exit
+  | Ret (Some e) ->
+      expr arg 0 e
+      ++ set_return
+      ++ exit
+
+let fct
+  {
+    retsz=rsz;
+    retal=ral;
+    fid=f;
+    formals=argc;
+    locals=n;
+    locsz=sz;
+    body=i;
+  } =
+  let argpos = Array.make n 0 in
+  let argsz = Array.make n 0 in
+  let argal = Array.make n false in
+  for i = 0 to n-1 do
+    let al,sz = sz.(i) in
+    argsz.(i) <- sz;
+    argal.(i) <- al;
+    if i = 0
+      then argpos.(i) <- 4-sz
+      else begin
+        argpos.(i) <-
+          if al
+            then (argpos.(i-1)-sz-3)/4*4
+            else argpos.(i-1)-sz
+      end
+  done;
+  let f =
+    {
+      ident="_"^f;
+      argpos=Array.to_list argpos;
+      argsz=Array.to_list argsz;
+      argal=Array.to_list argal;
+      rsz=rsz;
+      ral=ral;
+    } in
+  f_map := Smap.add f.ident f !f_map;
+  let frame_ofs = (argpos.(n-1)-11)/4*4 in (* two spots for $ra and $fp *)
+  (* Putting output value in the right place *)
+  let set_return =
+    if rsz > 4
+      then store ral rsz (-rsz+4) FP 0
+      else Move (V0,A0)
+  in
+  let exit =
+    Lw (FP,4,SP)
+    ++ Lw (RA,8,SP)
+    ++ Jr RA
+  in
+  let alloc_frame =
+    Unop (SP,Addi (of_int frame_ofs),SP)
+    ++ Sw (FP,4,SP)
+    ++ Sw (RA,8,SP)
+    ++ Unop (FP,Subi (of_int frame_ofs),SP)
+  in
+  Label f.ident
+  ++ alloc_frame
+  ++ instr argpos (set_return,exit) i
