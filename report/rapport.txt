@@ -1,43 +1,27 @@
-\documentclass[a4paper]{article}
-
-\usepackage[french]{babel}
-\usepackage[T1]{fontenc}
-\usepackage[utf8]{inputenc}
-\usepackage{fullpage}
-\usepackage{pgf}
-\usepackage{tikz}
-
-\begin{document}
-
-\title{Compilateur MiniC}
-\author{Li-yao Xia}
-\date{\today}
-
-\maketitle
-%\normalsize
-
-\section{Commentaires généraux}
+** Rapport du projet de compilateur MiniC **
+*              Xia Li-yao                  *
 
 Comme je ne savais pas par où commencer,
 j'ai choisi d'écrire le compilateur dans l'ordre
 des différentes étapes de l'analyse. 
 
-Lexeur -> Parseur -> Typeur
+Lexeur -> Parseur -> Typeur -> Selection d'instructions (IS) -> MIPS
 
-Les fichiers qui composent mon programme sont :
-\begin{itemize}
-  \item {\it lexer.mll}
-  \item {\it ast.mli} - Décrit le type d'arbre de syntaxe
-  abstraite décoré en sortie du parseur.
-  \item {\it parser.mly}
-  \item {\it error.ml} - Fichier commun à tout le programme,
-  de gestion d'erreurs (affichage des messages d'erreur)
-  \item {\it typing.ml/.mli}
-  \item {\it main.ml}
+Les fichiers qui composent mon programme sont (avec eventuellement
+une interface) :
+  - error.ml - Fichier commun à tout le programme, de gestion d'erreurs
+              (affichage des messages d'erreur)
+  - ast.mli - Décrit le type d'arbre de syntaxe abstraite décoré en
+              sortie du parseur.
+  - lexer.mll
+  - parser.mly
+  - typing.ml
+  - iselect.ml
+  - print_ist.ml - Affichage de l'arbre en sortie de l'IS
+  - mips.ml - Generation
+  - main.ml
 \end{itemize}
 
-(Il y a un fichier {\it parser\_test.ml} mais il ne fait pas
-partie du programme final)
 
 \section{Choix et difficultés}
 

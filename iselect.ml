@@ -275,7 +275,7 @@ and mk_seq e1 e2 = match mk_sub e1 e2 with
 
 and mk_sle e1 e2 = match e1,e2 with
   | Mconst n,Mconst m ->
-      if compare n m >= 0
+      if compare n m <= 0
         then Mconst one
         else Mconst zero
   | Mconst n,e ->
@@ -290,7 +290,7 @@ and mk_sle e1 e2 = match e1,e2 with
 
 and mk_slt e1 e2 = match e1,e2 with
   | Mconst n,Mconst m ->
-      if compare n m > 0
+      if compare n m < 0
         then Mconst one
         else Mconst zero
   | e, Mconst m -> Munop (Slti m,e)

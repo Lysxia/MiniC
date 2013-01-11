@@ -68,6 +68,7 @@ let compile file =
       else f^".s" in
     let h = open_out f in
     print_prog h tast;
+    close_out h;
     0
   with
     | Error.E (sp,ep,s) -> close_in h; Error.prerr file sp ep s; 1

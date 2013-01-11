@@ -3,7 +3,8 @@
 #
 ## Append > /dev/zero to shut them up
 
-SRC=error.ml lexer.mll parser.mly ast.mli typing.mli typing.ml \
+SRC=smap.ml sset.ml \
+		error.ml lexer.mll parser.mly ast.mli typing.mli typing.ml \
 		iselect.mli iselect.ml print_ist.ml mips.mli mips.ml \
 		ast_printer.ml print_mips.ml main.ml
 PARSER_GEN=parser.automaton parser.conflicts
@@ -24,5 +25,10 @@ test: $(BIN) utest/ktst.c
 	./$(BIN) utest/ktst.c
 
 project:
-	@cp Makefile main.ml lexer.mll parser.mly ast.mli error.ml smap.ml sset.ml typing.ml typing.mli mipsofast.ml report/report_compiler.pdf parser_test.ml test.sh xia-liyao/
+	mkdir xia-liyao
+	cp Makefile main.ml lexer.mll parser.mly ast.mli error.ml smap.ml sset.ml \
+		typing.ml typing.mli mipsofast.ml report/rapport.txt \
+	  test.sh iselect.ml iselect.mli mips.ml mips.mli \
+		ast_printer.ml print_ist.ml print_mips.ml print_mips.mli \
+		xia-liyao/
 	tar -zcf xia-liyao.tgz xia-liyao

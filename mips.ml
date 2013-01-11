@@ -116,7 +116,7 @@ let load a s ofs reg sp =
           assert (s>0);
           for i=0 to s-2 do
             ls :=
-              Unop (A0,Sll 4,A0)
+              Unop (A0,Sll 8,A0)
               ++ Lb (A2,ofs+i,reg)
               ++ Binop (A0,Or,A0,A2)
               ++ !ls
@@ -156,7 +156,7 @@ let store a s ofs reg sp =
         else begin
           for i=s-1 downto 1 do
             ls :=
-              Unop (A0,Srl 4,A0)
+              Unop (A0,Srl 8,A0)
               ++ Sb (A0,ofs+i,reg)
               ++ !ls
           done;
@@ -190,8 +190,9 @@ and expr argpos sp =
     let rec store_args sp el pos al sz = match el,pos,al,sz with
       | [],_,_,_ -> Nop
       | e::el,p::pos,a::al,s::sz ->
+          let sp = if a then (sp-3)/4*4 else sp in
           expr argpos sp e
-          ++ (if s>4 then Nop else store a s sp SP sp)
+          ++ (if s>4 then Nop else store a s p SP sp)
           ++ store_args (sp-s) el pos al sz
       | _,_,_,_ -> assert false
     in
@@ -209,12 +210,12 @@ and expr argpos sp =
       let hd,ft =
         if sp = 0
           then Nop,Nop
-          else Unop (SP,Addi (of_int sp),SP),
-               Unop (SP,Subi (of_int sp),SP) in
+          else Unop (SP,Addi (of_int (sp+s)),SP),
+               Unop (SP,Subi (of_int (sp+s)),SP) in
       let load_field =
         if s > 4
-          then load a sz (to_int n-s+4) SP sp
-          else Unop (A0,Srl (s+to_int n),A0) in
+          then load a sz (sp+to_int n-s+4) SP sp
+          else Unop (A0,Srl (8*to_int n),A0) in
       hd
       ++ store_args f el
       ++ Jal f.ident

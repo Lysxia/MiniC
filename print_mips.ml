@@ -49,8 +49,8 @@ let print_ma h instr r ofs s =
 let rec print_unop h u r s = match u with
   | Neg -> print2 h "neg" r s
   | Andi n -> print21 h "andi" r s n
-  | Addi n -> print21 h "addiu" r s n
-  | Subi n -> print21 h "subiu" r s n
+  | Addi n -> print21 h "addu" r s n
+  | Subi n -> print21 h "subu" r s n
   | Muli n -> print21 h "mul" r s n
   | Divi n -> print21 h "div" r s n
   | Remi n -> print21 h "rem" r s n
