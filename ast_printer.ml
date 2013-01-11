@@ -1,3 +1,4 @@
+open Ast
 open Typing
 
 let print_tident h = Format.fprintf h "%d"
@@ -12,6 +13,11 @@ let rec string_of_tt = function
   | U i -> "union "^(string_of_int i)
   | P (i,t) -> (string_of_tt t)^(String.make i '*')
   | Null -> "typenull"
+
+let unop_string = function
+  | Incrp | Decrp | Incrs | Decrs 
+  | Address | Not | Uminus | Uplus -> "#"
+  | Star -> "*"
 
 let rec print_elist h = function
   | [] -> ()
@@ -29,8 +35,8 @@ and print_texpr h {tdesc=e ; t=t} = match e with
     Format.fprintf h "@[(%a=%a)@]@," print_texpr e1 print_texpr e2
   | TCall (f,arg) ->
     Format.fprintf h "@[%a(%a)@]" print_tname f print_elist arg
-  | TUnop (_,e) ->
-    Format.fprintf h "@[#(%a)@]" print_texpr e
+  | TUnop (u,e) ->
+    Format.fprintf h "@[%s(%a)@]" (unop_string u) print_texpr e
   | TBinop (_,e1,e2) ->
     Format.fprintf h "@[(%a$%a)@]@," print_texpr e1 print_texpr e2
   | TSizeof t ->

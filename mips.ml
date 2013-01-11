@@ -1,10 +1,5 @@
-(* We now produce code straight out of instruction selection *) (*
-Calling convention :
-  * ALL arguments go on the stack Return values are stored either in $v0
-  * or on the stack : Values with size > 4 go on the stack at 0($fp)
-  * Others go in $v0 *)
-(* All local variables are stored on the stack too *)
-(* Intermediate results are put on stack *)
+(** Mini-C Compiler **)
+(* Li-yao Xia *)
 
 open Int32
 open Iselect
@@ -41,6 +36,8 @@ type text =
 
 type data = (string*Ast.str list)
 
+type argpos = int array
+
 type fct =
   {
     ident:string;
@@ -59,11 +56,16 @@ let rec last = function
 let last2 t =
   let rec last2 = function
     | Concat (t1,t2) ->
-        let b,(i1,i2) = last2 t2 in
-        if b then true,(i1,i2)
-          else true,(last t1,i2)
-    | t -> false,(Nop,t)
-  in snd (last2 t)
+        let i = last2 t2 in
+        if List.length i = 2 then i
+        else if List.length i = 0 then last2 t1
+        else (match last2 t1 with
+          | [] -> i
+          | [i_] | [_;i_] -> i_::i
+          | _ -> assert false)
+    | Comment _ | Label _ | Nop _ -> []
+    | t -> [t]
+  in last2 t
 
 let (++) c1 c2 = match c1,c2 with
   | Nop,_ -> c2
@@ -80,7 +82,6 @@ let f_map:fct Smap.t ref = ref Smap.empty
 
 let recmain = ref false
 
-(* Load ofs(reg) into $a0 or stack when s>4 *)
 let load a s ofs reg sp =
   if a
     then
@@ -89,8 +90,8 @@ let load a s ofs reg sp =
         else begin
           let ls = ref Nop in
           for i = 0 to s/4-1 do
-            ls := Lw (A2,ofs+s*i,reg)
-              ++ Sw (A2,sp+s*i,SP)
+            ls := Lw (A2,ofs+4*i,reg)
+              ++ Sw (A2,sp+4*i,SP)
               ++ !ls
           done;
           !ls
@@ -105,8 +106,11 @@ let load a s ofs reg sp =
               ++ !ls
           done
         else
-          for i=0 to s-1 do
-            ls := Unop (A0,Sll 4,A0)
+          assert (s>0);
+          ls := Lb (A0,ofs,reg);
+          for i=1 to s-1 do
+            ls :=
+              (if i=s-1 then Nop else Unop (A0,Sll 4,A0))
               ++ Lb (A2,ofs+i,reg)
               ++ Binop (A0,Or,A0,A2)
               ++ !ls
@@ -114,26 +118,27 @@ let load a s ofs reg sp =
         !ls
     end
 
-(* Store last calculated value which is saved
- *  in $a0 or in stack (if s > 4) in ofs($reg) *)
+(* Store last calculated value *)
 let store a s ofs reg sp =
-  if s=4
+  if s<=4
     then
       if a
         then Sw (A0,ofs,reg)
         else begin
           let ls = ref Nop in
           for i=0 to s-1 do
-            ls := Lb (A2,sp+i,SP)
-            ++ Sb (A2,ofs+i,reg)
-            ++ !ls
+            ls :=
+              (if i=s-1 then Nop else Unop (A0,Srl 4,A0))
+              ++ Sb (A0,ofs+i,reg)
+              ++ Binop (A0,Or,A0,A2)
+              ++ !ls
           done;
           !ls
         end
-    else begin
+    else begin (* Value to be stored is on stack *)
       let ls = ref Nop in
-      if a (* Value to store is on stack *)
-        then begin (* Value to be stored is on stack *)
+      if a
+        then begin
           for i = 0 to s/4-1 do
             ls := Lw (A2,ofs+s*i,SP)
               ++ Sw (A2,sp+s*i,reg)
@@ -142,10 +147,9 @@ let store a s ofs reg sp =
         end
         else
           for i=0 to s-1 do
-            ls := Unop (A0,Sll 4,A0)
-              ++ Sb (A2,ofs+i,reg)
-              ++ Binop (A0,Or,A0,A2)
-              ++ !ls
+            ls := Lb (A2,sp+i,SP)
+            ++ Sb (A2,ofs+i,reg)
+            ++ !ls
           done;
         !ls
     end
@@ -163,15 +167,13 @@ let branching brch_instr l1 l2 b1 b2 =
 (* e1 and e2 are int or char typed expressions*)
 (* stores the outputs in A0 and A1 *)
 let rec byte_pair argpos sp e1 e2 =
-  expr argpos sp e1
-  ++ store true 4 sp SP sp
-  ++ expr argpos (sp-4) e2
-  ++ Move (A1,A0)
-  ++ load true 4 sp SP sp
+  let sp = (sp+3)/4*4 in
+  expr argpos sp e2
+  ++ Sw (A0,sp,SP)
+  ++ expr argpos (sp-4) e1
+  ++ Lw (A1,sp,SP)
 
 (* convert expr to a sequence of mips instructions *)
-(* argpos gives the offset of each argument relatively to $fp
- * Result is put on stack if its size is > 4, $a0 otherwise *)
 and expr argpos sp =
   let store_args f el =
     let rec store_args sp el pos al sz = match el,pos,al,sz with
@@ -195,11 +197,12 @@ and expr argpos sp =
       ++ Move (A1,A0)
       ++ load a s (to_int n) A1 (sp-s)
   | Mstor (a,s,e,n,f) ->
-    expr argpos sp f
-    ++ Sw (A0,sp,SP)
-    ++ expr argpos (sp-4) e
-    ++ Lw (A1,sp,SP)
-    ++ store a s (to_int n) A1 (sp-s)
+      let sp2 = (sp-3)/4*4 in
+      expr argpos sp2 f
+      ++ Sw (A0,sp2,SP)
+      ++ expr argpos (sp2-4) e
+      ++ Lw (A1,sp2,SP)
+      ++ store a s (to_int n) A1 (sp-s)
   | Maddr i -> Unop (A0,Addi (of_int argpos.(i)),FP)
   | Mcall (_,"putchar",el) ->
       expr argpos sp (List.hd el)
@@ -214,10 +217,15 @@ and expr argpos sp =
         then recmain := true;
       let f = Smap.find f !f_map in
       let sp = (sp-3)/4*4 in
-      Unop (SP,Addi (of_int sp),SP)
+      let hd,ft =
+        if sp = 0
+          then Nop,Nop
+          else Unop (SP,Addi (of_int sp),SP),
+               Unop (SP,Subi (of_int sp),SP) in
+      hd
       ++ store_args f el
       ++ Jal f.ident
-      ++ Unop (SP,Subi (of_int sp),SP)
+      ++ ft
   | Munop (u,e) -> (expr argpos sp e)++Unop(A0,u,A0)
   | Mbinop (o,e1,e2) ->
       byte_pair argpos sp e1 e2
@@ -297,7 +305,7 @@ and branch argpos sp e l = match e with
       ++ Bbch (Ble,A0,A1,l)
   | e ->
       expr argpos sp e
-      ++ Ubch (Beqz,A0,l)
+      ++ Ubch (Bnez,A0,l)
 
 let rec instr arg ((set_return,exit) as quit) = function
   | Iselect.Nop -> Nop
@@ -309,21 +317,19 @@ let rec instr arg ((set_return,exit) as quit) = function
            (instr arg quit i1) (instr arg quit i2)
       ++ Comment ("endif "^k)
   | While (e,i) ->
-      let k = fresh2 () in
       let l = "while"^fresh () in
       let l_ = l^"_0" in
-      Comment ("while "^k)
+      Comment l
       ++ J l_
       ++ Label l
       ++ instr arg quit i
       ++ Label l_
       ++ branch arg 0 e l
-      ++ Comment ("endwhile "^k)
+      ++ Comment ("end"^l)
   | For (init,cond,inc,i) ->
-      let k = fresh2 () in
       let l = "for"^fresh () in
       let l_ = l^"_0" in
-      Comment ("for "^k)
+      Comment l
       ++ List.fold_left (++) Nop (List.map (expr arg 0) init)
       ++ J l_
       ++ Label l
@@ -331,7 +337,7 @@ let rec instr arg ((set_return,exit) as quit) = function
       ++ List.fold_left (++) Nop (List.map (expr arg 0) inc)
       ++ Label l_
       ++ branch arg 0 cond l
-      ++ Comment ("endfor "^k)
+      ++ Comment ("end"^l)
   | Bloc i ->
       let k = fresh2 () in
       Comment ("bloc "^k)
@@ -344,16 +350,8 @@ let rec instr arg ((set_return,exit) as quit) = function
       ++ set_return
       ++ exit
 
-let fct
-  {
-    retsz=rsz;
-    retal=ral;
-    fid=f_;
-    formals=argc;
-    locals=n;
-    locsz=sz;
-    Iselect.body=i;
-  } =
+let mk_frame sz =
+  let n = Array.length sz in
   let argpos = Array.make n 0 in
   let argsz = Array.make n 0 in
   let argal = Array.make n false in
@@ -370,6 +368,19 @@ let fct
             else argpos.(i-1)-sz
       end
   done;
+  argpos,argsz,argal
+
+let fct
+  {
+    retsz=rsz;
+    retal=ral;
+    fid=f_;
+    formals=argc;
+    locals=n;
+    locsz=sz;
+    Iselect.body=i;
+  } =
+  let argpos,argsz,argal = mk_frame sz in
   let f =
     {
       ident="_"^f_;
@@ -412,9 +423,10 @@ let fct
 let collect acc defrost f =
   if f.fid = "main"
     then begin
-      (* Abort recompiling main *)
+      (* Abort compiling main *)
       defrost := (fun () -> fct f);
-      (* Insert a dummy "main" element *)
+      let argpos,_,_ = mk_frame f.locsz in
+      (* Insert a dummy "_main" element *)
       let m =
         {
           ident="_"^f.fid;
@@ -430,10 +442,10 @@ let collect acc defrost f =
         if f.formals=0
           then Nop
           else Sw (A0,0,SP) ++ Sw (A1,-4,SP) in
-      let frame_ofs = -f.formals*4 in
-      let set_return =
-        Move (V0,A0)
-      in
+      let frame_ofs =
+        if f.locals=0
+          then 0
+          else (argpos.(f.locals-1)-4)/4*4 in
       let exit =
         Li (V0,of_int 10)
         ++ Syscall
@@ -444,13 +456,13 @@ let collect acc defrost f =
               then Nop
               else Unop (SP,Addi (of_int frame_ofs),SP))
       in
-      let body = instr [|0;-4|] (set_return,exit) f.Iselect.body in
+      let body = instr [|0;-4|] (Nop,exit) f.Iselect.body in
       acc := Some (
         Label "main"
         ++ start
         ++ alloc_frame
         ++ body
-        ++ (if last2 body = (Li (V0,of_int 10), Syscall)
+        ++ (if last2 body = [Li (V0,of_int 10); Syscall]
               then Nop
               else exit))
     end

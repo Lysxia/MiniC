@@ -3,8 +3,9 @@
 #
 ## Append > /dev/zero to shut them up
 
-SRC=error.ml lexer.mll parser.mly ast.mli typing.ml \
-		iselect.ml mips.ml print_mips.ml
+SRC=error.ml lexer.mll parser.mly ast.mli typing.mli typing.ml \
+		iselect.mli iselect.ml print_ist.ml mips.mli mips.ml \
+		ast_printer.ml print_mips.ml
 PARSER_GEN=parser.automaton parser.conflicts
 BIN=minic
 

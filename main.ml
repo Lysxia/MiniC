@@ -29,7 +29,9 @@ let speclist = [
   "-batch",Arg.Set batch,
     "Compile multiple files (separately)";
   "-print", Arg.Set print,
-    "Print compiled tree when -type-only is enabled";
+    "Print compiled tree when -type-only or -ist is enabled";
+  "-ist", Arg.Set is,
+    "Stop at instruction selection";
   ]
 
 let args = ref []
@@ -51,6 +53,12 @@ let compile file =
     if !type_only
       then begin
         if !print then Ast_printer.print_tfile fstdout tast;
+        interrupt 0
+      end;
+    if !is
+      then begin
+        let fl = Iselect.isprog tast in
+        Print_ist.print_file fstdout fl;
         interrupt 0
       end;
     let f = Filename.basename file in

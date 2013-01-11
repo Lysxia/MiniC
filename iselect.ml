@@ -1,27 +1,33 @@
 (** Mini-C Compiler **)
 (* Li-yao Xia *)
 
-(* Variables are stored in pseudo-registers *)
-(* instruction 'la' will force a variable to be on the stack *)
-
 open Typing
 open Int32
-(* This module is intensively used since we do a lot of evaluation *)
+(* ^ This module is intensively used since we do a lot of evaluation *)
 
 module Iset = Set.Make(struct type t=int let compare=Pervasives.compare end)
 
 type munop =
   | Neg
-  | Divi of t (* WRITTEN div IN MIPS *)
+  | Divi of t
   | Remi of t
-  | Addi of t | Muli of t | Subi of t
-  | Slti of t | Seqi of t | Snei of t | Sgti of t
-  | Andi of t | Sltiu of t
+  | Addi of t
+  | Subi of t
+  | Muli of t
+
+  | Slti of t
+  | Seqi of t
+  | Snei of t
+  | Sgti of t
+  | Andi of t
+
+  | Sltiu of t
+
+  | Srl of int
   | Sll of int
 
 type mbinop =
-  | Add | Div | Mul | Sub | Rem | Seq | Sne | Slt | Sle
-  | Sltu | Or
+  | Add | Div | Mul | Sub | Rem | Seq | Sne | Slt | Sle | Sltu | Or
   (* slt, sltu, sltiu, slti are basic instructions,
    * others are pseudo-instruction
    * (and seq is not optimally translated)
@@ -83,7 +89,7 @@ let log2 x =
 
 let constr = Hashtbl.create 17
 
-let data:(string*data) list ref = ref []
+let data = ref []
 
 let aligned = function
   | C -> false
@@ -348,7 +354,12 @@ let mk_unop t u x =
   | Ast.Decrs -> mk_t_add t I (mk_move x (mk_t_sub t I x one)) one
   (* i++ ~ (i=i+1)-1*)
   | Ast.Not -> mk_not x
-  | Ast.Star -> mk_deref t x
+  | Ast.Star ->
+    begin
+      match t with
+        | P (n,t) -> mk_deref (if n=1 then t else P (n-1,t)) x
+        | _ -> assert false
+    end
   | Ast.Address -> mk_la x
   | Ast.Uminus -> mk_neg x
   | Ast.Uplus -> x
@@ -371,7 +382,7 @@ let mk_binop o e1 e2 = match o with
 let rec isexpr {tdesc=e;t=t} = match e with
   | TCi n -> Mconst n
   | TLoc i -> mk_deref t (Maddr i)
-  | TGlo x -> mk_load t zero (Mla x)
+  | TGlo x -> mk_load t zero (Mla ("_"^x))
   | TAssign (e1,e2) -> mk_move (isexpr e1) (isexpr e2)
   | TCall (f,l) -> Mcall (sizeof t,f,List.map isexpr l)
   | TUnop (u,e) -> mk_unop e.t u (isexpr e)
@@ -422,7 +433,7 @@ let isfct {
   }
 
 let gvars vl =
-  List.iter (fun (t,v) -> data:=(v,Space (sizeof t))::!data) vl
+  List.iter (fun (t,v) -> data:=("_"^v,Space (sizeof t))::!data) vl
 
 (* Next multiple of 4 *)
 let round_4 i = (i+3)/4*4
@@ -458,6 +469,12 @@ let isconstr = function
         then s_max := (!s_max+3)/4*4;
       Hashtbl.add constr i (!s_max,!align,[||])
   | _ -> assert false
+
+let isprog (c,f,v) =
+  List.iter isconstr c;
+  gvars v;
+  List.map isfct f
+
 
 (**)
 let reset () =

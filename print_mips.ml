@@ -1,3 +1,6 @@
+(** Mini-C Compiler **)
+(* Li-yao Xia *)
+
 open Iselect
 open Mips
 open Int32
@@ -56,6 +59,7 @@ let rec print_unop h u r s = match u with
   | Sgti n -> print21 h "sgt" r s n
   | Seqi n -> print21 h "seq" r s n
   | Snei n -> print21 h "sne" r s n
+  | Srl k -> fprintf h "\tsrl %s,%s,%d\n" (reg_string r) (reg_string s) k
   | Sll k -> fprintf h "\tsll %s,%s,%d\n" (reg_string r) (reg_string s) k
 
 let rec binop_string = function
@@ -98,12 +102,12 @@ let rec print_text h = function
   | Comment s -> fprintf h "\t#%s\n" s
   | Concat (t1,t2) -> print_text h t1; print_text h t2
   | Li (r,n) -> fprintf h "\tli %s,%s\n" (reg_string r) (to_string n)
-  | La (r,s) -> fprintf h "\tla %s,%s\n" (reg_string r) ("_"^s)
+  | La (r,s) -> fprintf h "\tla %s,%s\n" (reg_string r) s
   | Move (r,s) -> print2 h "move" r s
   | Unop (r,u,s) -> print_unop h u r s
   | Binop (r,o,s,t) -> print3 h (binop_string o) r s t
   | Lw (r,ofs,t) -> print_ma h "lw" r ofs t
-  | Lb (r,ofs,t) -> print_ma h "lb" r ofs t
+  | Lb (r,ofs,t) -> print_ma h "lbu" r ofs t
   | Sw (r,ofs,t) -> print_ma h "sw" r ofs t
   | Sb (r,ofs,t) -> print_ma h "sb" r ofs t
   | J l -> fprintf h "\tj %s\n" l
@@ -116,10 +120,10 @@ let rec print_text h = function
 
 let print_data h (s,x) =
   match x with
-    | Space n -> fprintf h "%s:\t.space\t%d\n" s n
-    | Str (Ast.Str u) -> fprintf h "%s:\t.asciiz\t\"%s\"\n" s u
+    | Space n -> fprintf h "%s:\n\t.space\t%d\n" s n
+    | Str (Ast.Str u) -> fprintf h "%s:\n\t.asciiz\t\"%s\"\n" s u
     | Str (Ast.Ascii u) ->
-        fprintf h "%s:\t.byte\t" s;
+        fprintf h "%s:\n\t.byte\t" s;
         for i = 0 to Array.length u-1 do
           fprintf h "%d," u.(i);
         done;
