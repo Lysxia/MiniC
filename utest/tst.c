@@ -35,6 +35,4 @@ int main(int a, char** c)
 
   if (0) if (0) 0; else 1;
 
-  return;
-
 }

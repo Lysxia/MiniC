@@ -4,7 +4,7 @@
 ## Append > /dev/zero to shut them up
 
 SRC=error.ml lexer.mll parser.mly ast.mli typing.ml \
-		iselect.ml mips.ml
+		iselect.ml mips.ml print_mips.ml
 PARSER_GEN=parser.automaton parser.conflicts
 BIN=minic
 
@@ -19,8 +19,8 @@ clean:
 parser_test: parser_test.ml
 	@ocamlbuild -quiet parser_test.native
 
-test: $(BIN) tests/
-	@sh test.sh
+test: $(BIN) utest/ktst.c
+	./$(BIN) utest/ktst.c
 
 project:
 	@cp Makefile main.ml lexer.mll parser.mly ast.mli error.ml smap.ml sset.ml typing.ml typing.mli mipsofast.ml report/report_compiler.pdf parser_test.ml test.sh xia-liyao/

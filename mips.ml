@@ -20,6 +20,7 @@ type label = string
 
 type text =
   | Nop
+  | Comment of string
   | Li of reg*t
   | La of reg*string
   | Move of reg*reg
@@ -38,7 +39,7 @@ type text =
   | Label of label
   | Concat of text*text
 
-let data = (string*Ast.str list)
+type data = (string*Ast.str list)
 
 type fct =
   {
@@ -48,7 +49,21 @@ type fct =
     argal:bool list;
     rsz:int;
     ral:bool;
+    mutable body:text
   }
+
+let rec last = function
+  | Concat (_,t) -> last t
+  | t -> t
+
+let last2 t =
+  let rec last2 = function
+    | Concat (t1,t2) ->
+        let b,(i1,i2) = last2 t2 in
+        if b then true,(i1,i2)
+          else true,(last t1,i2)
+    | t -> false,(Nop,t)
+  in snd (last2 t)
 
 let (++) c1 c2 = match c1,c2 with
   | Nop,_ -> c2
@@ -56,12 +71,14 @@ let (++) c1 c2 = match c1,c2 with
   | _,_ -> Concat (c1,c2)
 
 let free = ref 0
-
 let fresh () = incr free; string_of_int !free
 
-let four = of_int 4
+let free2 = ref 0
+let fresh2 () = incr free2; string_of_int !free2
 
 let f_map:fct Smap.t ref = ref Smap.empty
+
+let recmain = ref false
 
 (* Load ofs(reg) into $a0 or stack when s>4 *)
 let load a s ofs reg sp =
@@ -133,12 +150,14 @@ let store a s ofs reg sp =
         !ls
     end
 
+(* brch is an instruction which branches to l1
+ * which corresponds to b1 *)
 let branching brch_instr l1 l2 b1 b2 =
   brch_instr
-  ++ b1
+  ++ b2
   ++ J l2
   ++ Label l1
-  ++ b2
+  ++ b1
   ++ Label l2
 
 (* e1 and e2 are int or char typed expressions*)
@@ -179,16 +198,26 @@ and expr argpos sp =
     expr argpos sp f
     ++ Sw (A0,sp,SP)
     ++ expr argpos (sp-4) e
-    ++ Lw (A2,sp,SP)
+    ++ Lw (A1,sp,SP)
     ++ store a s (to_int n) A1 (sp-s)
   | Maddr i -> Unop (A0,Addi (of_int argpos.(i)),FP)
+  | Mcall (_,"putchar",el) ->
+      expr argpos sp (List.hd el)
+      ++ Li (V0,of_int 11)
+      ++ Syscall
+  | Mcall (_,"sbrk",el) ->
+      expr argpos sp (List.hd el)
+      ++ Li (V0,of_int 9)
+      ++ Syscall
   | Mcall (s,f,el) ->
+      if f="main"
+        then recmain := true;
       let f = Smap.find f !f_map in
       let sp = (sp-3)/4*4 in
       Unop (SP,Addi (of_int sp),SP)
       ++ store_args f el
       ++ Jal f.ident
-      ++ Unop (SP,Subi (of_int sp),FP)
+      ++ Unop (SP,Subi (of_int sp),SP)
   | Munop (u,e) -> (expr argpos sp e)++Unop(A0,u,A0)
   | Mbinop (o,e1,e2) ->
       byte_pair argpos sp e1 e2
@@ -213,8 +242,8 @@ and condition arg sp e b1 b2 = match e with
       expr arg sp e ++ b2
   | e ->
       let l1 = "b"^fresh () in
-      let l2 = l1^"_" in
-      branching (branch arg sp e l2) l1 l2 b1 b2
+      let l2 = l1^"_0" in
+      branching (branch arg sp e l1) l1 l2 b1 b2
 
 and branch argpos sp e l = match e with
   | Mconst n -> if n=zero then Nop else J l
@@ -274,31 +303,44 @@ let rec instr arg ((set_return,exit) as quit) = function
   | Iselect.Nop -> Nop
   | Expr e -> expr arg 0 e
   | If (e,i1,i2) ->
-      condition arg 0 e
-        (instr arg quit i1) (instr arg quit i2)
+      let k = fresh2 () in
+      Comment ("if "^k)
+      ++ condition arg 0 e
+           (instr arg quit i1) (instr arg quit i2)
+      ++ Comment ("endif "^k)
   | While (e,i) ->
+      let k = fresh2 () in
       let l = "while"^fresh () in
-      let l_ = l^"_" in
-      J l_
+      let l_ = l^"_0" in
+      Comment ("while "^k)
+      ++ J l_
       ++ Label l
       ++ instr arg quit i
       ++ Label l_
       ++ branch arg 0 e l
+      ++ Comment ("endwhile "^k)
   | For (init,cond,inc,i) ->
+      let k = fresh2 () in
       let l = "for"^fresh () in
-      let l_ = l^"_" in
-      List.fold_left (++) Nop (List.map (expr arg 0) init)
+      let l_ = l^"_0" in
+      Comment ("for "^k)
+      ++ List.fold_left (++) Nop (List.map (expr arg 0) init)
       ++ J l_
       ++ Label l
       ++ instr arg quit i
       ++ List.fold_left (++) Nop (List.map (expr arg 0) inc)
       ++ Label l_
       ++ branch arg 0 cond l
+      ++ Comment ("endfor "^k)
   | Bloc i ->
-      List.fold_left (++) Nop (List.map (instr arg quit) i)
-  | Ret None -> exit
+      let k = fresh2 () in
+      Comment ("bloc "^k)
+      ++ List.fold_left (++) Nop (List.map (instr arg quit) i)
+      ++ Comment ("endbloc "^k)
+  | Ret None -> Comment ("return "^fresh ()) ++ exit
   | Ret (Some e) ->
-      expr arg 0 e
+      Comment ("returnv "^fresh ())
+      ++ expr arg 0 e
       ++ set_return
       ++ exit
 
@@ -306,11 +348,11 @@ let fct
   {
     retsz=rsz;
     retal=ral;
-    fid=f;
+    fid=f_;
     formals=argc;
     locals=n;
     locsz=sz;
-    body=i;
+    Iselect.body=i;
   } =
   let argpos = Array.make n 0 in
   let argsz = Array.make n 0 in
@@ -330,15 +372,18 @@ let fct
   done;
   let f =
     {
-      ident="_"^f;
+      ident="_"^f_;
       argpos=Array.to_list argpos;
       argsz=Array.to_list argsz;
       argal=Array.to_list argal;
       rsz=rsz;
       ral=ral;
+      body=Nop;
     } in
-  f_map := Smap.add f.ident f !f_map;
-  let frame_ofs = (argpos.(n-1)-11)/4*4 in (* two spots for $ra and $fp *)
+  f_map := Smap.add f_ f !f_map;
+  let frame_ofs =
+    if n=0 then -8
+    else (argpos.(n-1)-15)/4*4 in (* two spots for $ra and $fp *)
   (* Putting output value in the right place *)
   let set_return =
     if rsz > 4
@@ -346,16 +391,74 @@ let fct
       else Move (V0,A0)
   in
   let exit =
-    Lw (FP,4,SP)
-    ++ Lw (RA,8,SP)
+    Move (SP,FP)
+    ++ Lw (FP,frame_ofs+4,SP)
+    ++ Lw (RA,frame_ofs+8,SP)
     ++ Jr RA
   in
   let alloc_frame =
-    Unop (SP,Addi (of_int frame_ofs),SP)
-    ++ Sw (FP,4,SP)
-    ++ Sw (RA,8,SP)
+    Sw (FP,frame_ofs+4,SP)
+    ++ Sw (RA,frame_ofs+8,SP)
+    ++ Unop (SP,Addi (of_int frame_ofs),SP)
     ++ Unop (FP,Subi (of_int frame_ofs),SP)
   in
-  Label f.ident
-  ++ alloc_frame
-  ++ instr argpos (set_return,exit) i
+  let body = instr argpos (set_return,exit) i in
+  f.body <-
+    Label f.ident
+    ++ alloc_frame
+    ++ body
+    ++ (if last body = Jr RA then Nop else exit)
+
+let collect acc defrost f =
+  if f.fid = "main"
+    then begin
+      (* Abort recompiling main *)
+      defrost := (fun () -> fct f);
+      (* Insert a dummy "main" element *)
+      let m =
+        {
+          ident="_"^f.fid;
+          argpos=[0;-4];
+          argsz=[4;4];
+          argal=[true;true];
+          rsz=4;
+          ral=true;
+          body=Nop;
+        } in
+      f_map := Smap.add f.fid m !f_map;
+      let start =
+        if f.formals=0
+          then Nop
+          else Sw (A0,0,SP) ++ Sw (A1,-4,SP) in
+      let frame_ofs = -f.formals*4 in
+      let set_return =
+        Move (V0,A0)
+      in
+      let exit =
+        Li (V0,of_int 10)
+        ++ Syscall
+      in
+      let alloc_frame =
+        Move (FP,SP)
+        ++ (if frame_ofs = 0
+              then Nop
+              else Unop (SP,Addi (of_int frame_ofs),SP))
+      in
+      let body = instr [|0;-4|] (set_return,exit) f.Iselect.body in
+      acc := Some (
+        Label "main"
+        ++ start
+        ++ alloc_frame
+        ++ body
+        ++ (if last2 body = (Li (V0,of_int 10), Syscall)
+              then Nop
+              else exit))
+    end
+  else fct f
+
+(**)
+let reset () =
+  Iselect.reset ();
+  free := 0;
+  f_map := Smap.empty;
+  recmain := false

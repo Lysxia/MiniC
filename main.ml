@@ -1,6 +1,6 @@
 (** Mini-C Compiler **)
 (* Li-yao Xia *)
-open Mips
+open Print_mips
 
 exception Interrupt of int
 
@@ -29,9 +29,7 @@ let speclist = [
   "-batch",Arg.Set batch,
     "Compile multiple files (separately)";
   "-print", Arg.Set print,
-    "Print compiled tree";
-  "-is", Arg.Set is,
-    "Stop after instruction selection";
+    "Print compiled tree when -type-only is enabled";
   ]
 
 let args = ref []
@@ -55,12 +53,12 @@ let compile file =
         if !print then Ast_printer.print_tfile fstdout tast;
         interrupt 0
       end;
-    let ist = Iselect.file tast in
-    if !is
-      then begin
-        if !print then Print_ist.print_file fstdout ist;
-        interrupt 0;
-      end;
+    let f = Filename.basename file in
+    let f = if Filename.check_suffix f ".c"
+      then (Filename.chop_suffix f ".c")^".s"
+      else f^".s" in
+    let h = open_out f in
+    print_prog h tast;
     0
   with
     | Error.E (sp,ep,s) -> close_in h; Error.prerr file sp ep s; 1

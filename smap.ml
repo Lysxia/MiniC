@@ -64,3 +64,13 @@ let fold f t y =
         in Array.fold_left fold y t.next
   in
   fold y t
+
+let rec iter f = function
+  | None -> ()
+  | Some t ->
+    begin
+      match t.x with
+        | None -> ()
+        | Some x -> f t.loc x
+    end;
+    Array.iter (iter f) t.next

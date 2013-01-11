@@ -54,6 +54,10 @@ type instr =
 
 type vdec = int*string
 
+type data =
+  | Str of Ast.str
+  | Space of int
+
 type fct = {
   retsz:int;
   retal:bool;
@@ -79,7 +83,7 @@ let log2 x =
 
 let constr = Hashtbl.create 17
 
-let data:(int*Ast.str) list ref = ref []
+let data:(string*data) list ref = ref []
 
 let aligned = function
   | C -> false
@@ -109,8 +113,7 @@ let rec pure e = match e with
   | Mand (e1,e2)
   | Mor (e1,e2) -> pure e1 && pure e2
   | Mconst _ | Mla _ | Maddr _ -> true
-  | Mload _ | Mstor _
-  | Munop (Move _,_) -> false
+  | Mload _ | Mstor _ -> false
   | Munop (_,e) -> pure e
   | Mcall _ -> false
   (* Functions could be examined for pureness *)
@@ -315,8 +318,9 @@ let free_string = ref 0
 
 let mk_string s =
   incr free_string;
-  data := (!free_string,s)::!data;
-  "string"^string_of_int !free_string
+  let id = "string"^string_of_int !free_string in
+  data := (id,Str s)::!data;
+  id
 
 let mk_t_add t1 t2 e1 e2 = match t1,t2 with
   | P (n,t) as p,_ ->
@@ -418,7 +422,7 @@ let isfct {
   }
 
 let gvars vl =
-  List.map (fun (t,v) -> (sizeof t,v)) vl
+  List.iter (fun (t,v) -> data:=(v,Space (sizeof t))::!data) vl
 
 (* Next multiple of 4 *)
 let round_4 i = (i+3)/4*4
@@ -454,12 +458,6 @@ let isconstr = function
         then s_max := (!s_max+3)/4*4;
       Hashtbl.add constr i (!s_max,!align,[||])
   | _ -> assert false
-
-
-let file (c,f,v) =
-  List.iter isconstr c;
-  let f,v = List.map isfct f,gvars v in
-  f,v,!data
 
 (**)
 let reset () =
