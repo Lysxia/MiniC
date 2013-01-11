@@ -39,7 +39,7 @@ let args = ref []
 let collect arg = args := arg :: !args
 
 let reset () =
-  Iselect.reset ()
+  Mips.reset ()
 
 let compile file =
   let h = open_in file in
@@ -58,6 +58,7 @@ let compile file =
     if !is
       then begin
         let fl = Iselect.isprog tast in
+        Print_ist.print_constr fstdout;
         Print_ist.print_file fstdout fl;
         interrupt 0
       end;
@@ -94,4 +95,4 @@ let () =
           exit 2;
     in main !args
   with
-    | Interrupt 2 -> Printf.fprintf stdout "(╯°^°）╯︵ ┻━┻ Unexpected error.\n%!"; exit 2
+    | _ -> Printf.fprintf stdout "(╯°^°）╯︵ ┻━┻ Unexpected error.\n%!"; exit 2

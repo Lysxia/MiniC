@@ -38,6 +38,7 @@ type expr =
   | Mand    of expr*expr
   | Mor     of expr*expr
   | Mcall   of int*string*expr list
+  | Mcall_addr of int*string*expr list
 
 type instr =
   | Nop

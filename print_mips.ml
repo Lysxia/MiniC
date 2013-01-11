@@ -51,7 +51,7 @@ let rec print_unop h u r s = match u with
   | Andi n -> print21 h "andi" r s n
   | Addi n -> print21 h "addiu" r s n
   | Subi n -> print21 h "subiu" r s n
-  | Muli n -> print21 h "muli" r s n
+  | Muli n -> print21 h "mul" r s n
   | Divi n -> print21 h "div" r s n
   | Remi n -> print21 h "rem" r s n
   | Slti n -> print21 h "slti" r s n

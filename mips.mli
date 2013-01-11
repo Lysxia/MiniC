@@ -3,9 +3,10 @@
 
 (* We now produce code straight out of instruction selection *)
 (* Calling convention :
-  * ALL arguments go on the stack Return values are stored either in $v0
-  * or on the stack : Values with size > 4 go on the stack at 0($fp)
-  * Others go in $v0 *)
+  * ALL arguments go on the stack Return values are stored
+  * either in $a0 or on the stack :
+    * Values with size > 4 go on the stack at 0($fp)
+    * Others go in $a0 *)
 (* All local variables are stored on the stack too *)
 (* Intermediate results are put on stack *)
 
@@ -19,10 +20,19 @@
  * ...
  * local1
  * ...
- * intermediate1     <- $sp
+ * intermediate1   <- $sp
+ * ...
+ * ...
+ * 4 empty bytes <- 'sp'($sp)
  * ...
  *)
 (*****************************************)
+
+(* Two arguments frequently appear in those functions *)
+(* argpos (or arg) gives the position of local variables relative to $fp *)
+(* sp is the current stack top position relative to $sp *)
+(* it points to 4 free bytes (not necessarily aligned)
+ * 'sp+3'($sp) 'sp+2'($sp) 'sp+1'($sp) 'sp'($sp)  *)
 
 type reg = V0 | A0 | A1 | A2 | A3 | FP | SP | RA | ZERO
 
@@ -87,10 +97,6 @@ val f_map : fct Smap.t ref
 (* true if there are calls to main *)
 val recmain : bool ref
 
-(* Two arguments frequently appear in those functions *)
-(* argpos (or arg) gives the position of local variables relative to $fp *)
-(* sp is the current stack top position relative to $sp *)
-
 (* load a s ofs r sp *)
 (* Load ofs(r) into $a0 or stack when s>4 *)
 (* a : alignment of value to store
@@ -109,10 +115,10 @@ val store : bool -> int -> int -> reg -> int -> text
  * basically, if brch then l1 (execute b1) else l2 (execute b2) *)
 val branching : text -> label -> label -> text -> text -> text
 
-(* byte_pair argpos sp e1 e2 *)
+(* word_pair argpos sp e1 e2 *)
 (* e1 and e2 are int or char typed expressions
  * compute e2 then e1 and put the values in $a1 and $a0 *)
-val byte_pair : argpos -> int -> Iselect.expr -> Iselect.expr -> text
+val word_pair : argpos -> int -> Iselect.expr -> Iselect.expr -> text
 
 (* expr argpos sp e *)
 (* convert expr to a sequence of MIPS instructions *)

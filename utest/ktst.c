@@ -19,6 +19,27 @@ struct c2 {
   char c22;
 };
 
+struct u {
+  struct c2 w;
+  int x;
+};
+
+int somefun(char a,char b,int c)
+{
+}
+
+int caller()
+{
+  somefun(1,2,3);
+}
+
+int chararray()
+{
+  int i;
+  char *s, c;
+  c = s[i];
+}
+
 int conditions()
 {
   //Testing conditions
@@ -64,6 +85,24 @@ int loadstore()
   return 0;
 }
 
+struct s1 structfun()
+{
+  struct s1 x;
+  x.a = 97;
+  x.b = 98;
+  x.c = 99;
+  return x;
+}
+
+struct u struct2fun()
+{
+  struct u y;
+  y.w.c21 = 108;
+  y.w.c22 = 109;
+  y.x = 36;
+  return y;
+}
+
 int main()
 {
   // For loops
@@ -71,5 +110,17 @@ int main()
     int i;
     for (i=0; i<10 ; i++)
       putchar(i+97);
+    putchar(10);
+  }
+  //struct
+  {
+    putchar(structfun().a);
+    putchar(structfun().b);
+    putchar(structfun().c);
+    putchar(10);
+  }
+  {
+    putchar(struct2fun().w.c21);
+    putchar(struct2fun().w.c22);
   }
 }

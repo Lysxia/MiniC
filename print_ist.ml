@@ -64,7 +64,8 @@ let rec print_expr h = function
       fprintf h "(%a || %a)"
         print_expr e1
         print_expr e2
-  | Mcall (sz,f,l) ->
+  | Mcall (sz,f,l)
+  | Mcall_addr (sz,f,l) ->
       fprintf h "%s:%d(%a)"
         f sz print_elist l
 
@@ -123,5 +124,14 @@ let print_fct h
     rs f (fun h -> print_comma_sep_array h fml) a
     print_instr i
 
+let print_constr h id (sz,al,pos) =
+  fprintf h "%d %d %s\n" id sz (if al then "align" else "");
+  Array.iter (fun x -> fprintf h "%s " (to_string x)) pos;
+  fprintf h "\n"
+
+let print_constr h =
+  Hashtbl.iter (print_constr h) constr
+
 let print_file h f =
   List.iter (print_fct h) f
+

@@ -48,6 +48,7 @@ type expr =
   | Mand    of expr*expr
   | Mor     of expr*expr
   | Mcall   of int*string*expr list
+  | Mcall_addr of int*string*expr list
 
 type instr =
   | Nop
@@ -121,7 +122,7 @@ let rec pure e = match e with
   | Mconst _ | Mla _ | Maddr _ -> true
   | Mload _ | Mstor _ -> false
   | Munop (_,e) -> pure e
-  | Mcall _ -> false
+  | Mcall _ | Mcall_addr _ -> false
   (* Functions could be examined for pureness *)
 
 (* We use the fact that the evaluation order of operands
@@ -320,7 +321,8 @@ let mk_deref t e = match e with
 
 let mk_la e = match e with
   | Mload (_,_,n,e) -> mk_add (Mconst n) e
-  | _ -> assert false (* Not an l-value *)
+  | Mcall (s,f,el) -> Mcall_addr (s,f,el)
+  | _ -> assert false
 
 let free_string = ref 0
 

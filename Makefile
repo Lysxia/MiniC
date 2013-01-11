@@ -5,7 +5,7 @@
 
 SRC=error.ml lexer.mll parser.mly ast.mli typing.mli typing.ml \
 		iselect.mli iselect.ml print_ist.ml mips.mli mips.ml \
-		ast_printer.ml print_mips.ml
+		ast_printer.ml print_mips.ml main.ml
 PARSER_GEN=parser.automaton parser.conflicts
 BIN=minic
 
@@ -15,7 +15,7 @@ $(BIN): $(SRC)
 
 clean:
 	@ocamlbuild -clean > /dev/zero
-	@rm -rf $(PARSER_GEN) *\~
+	@rm -rf $(PARSER_GEN) *\~ *.s
 
 parser_test: parser_test.ml
 	@ocamlbuild -quiet parser_test.native

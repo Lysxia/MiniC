@@ -93,6 +93,7 @@ let load a s ofs reg sp =
       if s=4
         then Lw (A0,ofs,reg)
         else begin
+          let sp = (sp-s+1)/4*4 in
           let ls = ref Nop in
           for i = 0 to s/4-1 do
             ls := Lw (A2,ofs+4*i,reg)
@@ -105,6 +106,7 @@ let load a s ofs reg sp =
       let ls = ref Nop in
       if s > 4
         then
+          let sp = sp-s+4 in
           for i=0 to s-1 do
             ls := Lb (A2,ofs+i,reg)
               ++ Sb (A2,sp+i,SP)
@@ -131,6 +133,7 @@ let store a s ofs reg sp =
       if s=4
         then Sw (A0,ofs,reg)
         else begin
+          let sp = (sp-s+1)/4*4 in
           let ls = ref Nop in
           for i = 0 to s/4-1 do
             ls := Lw (A2,sp+4*i,SP)
@@ -139,10 +142,11 @@ let store a s ofs reg sp =
           done;
           !ls
         end
-    else begin (* Value to be stored is on stack *)
+    else begin
       let ls = ref Nop in
       if s>4
         then begin
+          let sp = sp-s+4 in
           for i=0 to s-1 do
             ls := Lb (A2,sp+i,SP)
             ++ Sb (A2,ofs+i,reg)
@@ -150,7 +154,7 @@ let store a s ofs reg sp =
           done;
         end
         else begin
-          for i=s-1 to 1 do
+          for i=s-1 downto 1 do
             ls :=
               Unop (A0,Srl 4,A0)
               ++ Sb (A0,ofs+i,reg)
@@ -173,8 +177,8 @@ let branching brch_instr l1 l2 b1 b2 =
 
 (* e1 and e2 are int or char typed expressions*)
 (* stores the outputs in A0 and A1 *)
-let rec byte_pair argpos sp e1 e2 =
-  let sp = (sp+3)/4*4 in
+let rec word_pair argpos sp e1 e2 =
+  let sp = (sp-3)/4*4 in
   expr argpos sp e2
   ++ Sw (A0,sp,SP)
   ++ expr argpos (sp-4) e1
@@ -186,31 +190,52 @@ and expr argpos sp =
     let rec store_args sp el pos al sz = match el,pos,al,sz with
       | [],_,_,_ -> Nop
       | e::el,p::pos,a::al,s::sz ->
-          (expr argpos sp e)
-          ++(if s>4 then Nop else store a s sp SP sp)
-          ++store_args (sp-s) el pos al sz
+          expr argpos sp e
+          ++ (if s>4 then Nop else store a s sp SP sp)
+          ++ store_args (sp-s) el pos al sz
       | _,_,_,_ -> assert false
     in
     store_args 0 el f.argpos f.argal f.argsz
   in function
   | Mconst n -> Li (A0,n)
   | Mla s -> La (A0,s)
-  
-  (*| Mload (a,s,n,Maddr i) ->
-    let ofs = add n (of_int argpos.(i)) in
-    let sp = sp - ((s+3)/4)*4 in
-    load a s ofs FP sp*)
+  | Mload (a,s,n,Maddr i) ->
+      let ofs = (to_int n)+argpos.(i) in
+      Comment (string_of_int argpos.(i)) ++
+      load a s ofs FP sp
+  | Mload (a,sz,n,Mcall_addr (s,f,el)) ->
+      let f = Smap.find f !f_map in
+      let sp = (sp-3)/4*4 in
+      let hd,ft =
+        if sp = 0
+          then Nop,Nop
+          else Unop (SP,Addi (of_int sp),SP),
+               Unop (SP,Subi (of_int sp),SP) in
+      let load_field =
+        if s > 4
+          then load a sz (to_int n-s+4) SP sp
+          else Unop (A0,Srl (s+to_int n),A0) in
+      hd
+      ++ store_args f el
+      ++ Jal f.ident
+      ++ ft
+      ++ load_field
   | Mload (a,s,n,e) ->
       expr argpos sp e
       ++ Move (A1,A0)
-      ++ load a s (to_int n) A1 (sp-s)
+      ++ load a s (to_int n) A1 sp
+  | Mstor (a,s,e,n,Maddr i) ->
+      let ofs = (to_int n)+argpos.(i) in
+      expr argpos sp e
+      ++ store a s ofs FP sp
   | Mstor (a,s,e,n,f) ->
-      let sp2 = (sp-3)/4*4 in
-      expr argpos sp2 f
-      ++ Sw (A0,sp2,SP)
-      ++ expr argpos (sp2-4) e
-      ++ Lw (A1,sp2,SP)
-      ++ store a s (to_int n) A1 (sp2-s-4)
+      (* We first compute the address, which must be aligned *)
+      let sp = (sp-3)/4*4 in
+      expr argpos sp f
+      ++ Sw (A0,sp,SP)
+      ++ expr argpos (sp-4) e
+      ++ Lw (A1,sp,SP)
+      ++ store a s (to_int n) A1 (sp-4)
   | Maddr i -> Unop (A0,Addi (of_int argpos.(i)),FP)
   | Mcall (_,"putchar",el) ->
       expr argpos sp (List.hd el)
@@ -220,6 +245,7 @@ and expr argpos sp =
       expr argpos sp (List.hd el)
       ++ Li (V0,of_int 9)
       ++ Syscall
+      ++ Move (A0,V0)
   | Mcall (s,f,el) ->
       if f="main"
         then recmain := true;
@@ -236,7 +262,7 @@ and expr argpos sp =
       ++ ft
   | Munop (u,e) -> (expr argpos sp e)++Unop(A0,u,A0)
   | Mbinop (o,e1,e2) ->
-      byte_pair argpos sp e1 e2
+      word_pair argpos sp e1 e2
       ++ Binop (A0,o,A0,A1)
   | Mand (e1,e2) ->
       condition argpos sp e1
@@ -245,17 +271,14 @@ and expr argpos sp =
   | Mor (e1,e2) ->
       condition argpos sp e1 (Li (A0,one))
         (expr argpos sp e2 ++ (Binop (A0,Sltu,ZERO,A0)))
+  | Mcall_addr _ -> assert false
 
 and condition arg sp e b1 b2 = match e with
   | Mconst n -> if n=zero then b2 else b1
-  | Mand (e1,e2) ->
-      condition arg sp e1 (condition arg sp e2 b1 b2) b2
-  | Mor (e1,e2) ->
-      condition arg sp e1 b1 (condition arg sp e2 b1 b2)
-  | Munop (Neg,e) ->
-      condition arg sp e b1 b2
-  | Munop (Muli zero,e) ->
-      expr arg sp e ++ b2
+  | Mand (e1,e2) -> condition arg sp e1 (condition arg sp e2 b1 b2) b2
+  | Mor (e1,e2) -> condition arg sp e1 b1 (condition arg sp e2 b1 b2)
+  | Munop (Neg,e) -> condition arg sp e b1 b2
+  | Munop (Muli zero,e) -> expr arg sp e ++ b2
   | e ->
       let l1 = "b"^fresh () in
       let l2 = l1^"_0" in
@@ -300,16 +323,16 @@ and branch argpos sp e l = match e with
             then Ubch (Bnez,A0,l)
             else Ubch (Bnei n,A0,l))
   | Mbinop (Seq,e1,e2) ->
-      byte_pair argpos sp e1 e2
+      word_pair argpos sp e1 e2
       ++ Bbch (Beq,A0,A1,l)
   | Mbinop (Sne,e1,e2) ->
-      byte_pair argpos sp e1 e2
+      word_pair argpos sp e1 e2
       ++ Bbch (Bne,A0,A1,l)
   | Mbinop (Slt,e1,e2) ->
-      byte_pair argpos sp e1 e2
+      word_pair argpos sp e1 e2
       ++ Bbch (Blt,A0,A1,l)
   | Mbinop (Sle,e1,e2) ->
-      byte_pair argpos sp e1 e2
+      word_pair argpos sp e1 e2
       ++ Bbch (Ble,A0,A1,l)
   | e ->
       expr argpos sp e
@@ -407,7 +430,7 @@ let fct
   let set_return =
     if rsz > 4
       then store ral rsz (-rsz+4) FP 0
-      else Move (V0,A0)
+      else Nop
   in
   let exit =
     Move (SP,FP)
