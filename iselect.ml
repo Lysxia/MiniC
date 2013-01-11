@@ -203,6 +203,8 @@ and mk_mul e1 e2 = match e1,e2 with
   | Mconst n, e | e, Mconst n ->
       if n=zero && pure e
         then Mconst zero
+      else if n=one
+        then e
         else let p,k = log2 n in
           if p then Munop (Sll k, e) else Munop (Muli n, e)
   | Munop (Neg,e1),e2

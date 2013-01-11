@@ -50,7 +50,12 @@ type fct =
   }
 
 let rec last = function
-  | Concat (_,t) -> last t
+  | Concat (t1,t2) ->
+      begin try
+        last t2
+      with Not_found -> last t1
+      end
+  | Comment _ | Nop -> raise Not_found
   | t -> t
 
 let last2 t =
@@ -63,7 +68,7 @@ let last2 t =
           | [] -> i
           | [i_] | [_;i_] -> i_::i
           | _ -> assert false)
-    | Comment _ | Label _ | Nop _ -> []
+    | Comment _ | Nop -> []
     | t -> [t]
   in last2 t
 
@@ -105,52 +110,54 @@ let load a s ofs reg sp =
               ++ Sb (A2,sp+i,SP)
               ++ !ls
           done
-        else
+        else begin
           assert (s>0);
-          ls := Lb (A0,ofs,reg);
-          for i=1 to s-1 do
+          for i=0 to s-2 do
             ls :=
-              (if i=s-1 then Nop else Unop (A0,Sll 4,A0))
+              Unop (A0,Sll 4,A0)
               ++ Lb (A2,ofs+i,reg)
               ++ Binop (A0,Or,A0,A2)
               ++ !ls
           done;
+          ls := Lb (A0,ofs+s-1,reg) ++ !ls;
+        end;
         !ls
     end
 
 (* Store last calculated value *)
 let store a s ofs reg sp =
-  if s<=4
+  if a
     then
-      if a
+      if s=4
         then Sw (A0,ofs,reg)
         else begin
           let ls = ref Nop in
-          for i=0 to s-1 do
-            ls :=
-              (if i=s-1 then Nop else Unop (A0,Srl 4,A0))
-              ++ Sb (A0,ofs+i,reg)
-              ++ Binop (A0,Or,A0,A2)
+          for i = 0 to s/4-1 do
+            ls := Lw (A2,sp+4*i,SP)
+              ++ Sw (A2,ofs+4*i,reg)
               ++ !ls
           done;
           !ls
         end
     else begin (* Value to be stored is on stack *)
       let ls = ref Nop in
-      if a
+      if s>4
         then begin
-          for i = 0 to s/4-1 do
-            ls := Lw (A2,ofs+s*i,SP)
-              ++ Sw (A2,sp+s*i,reg)
-              ++ !ls
-          done
-        end
-        else
           for i=0 to s-1 do
             ls := Lb (A2,sp+i,SP)
             ++ Sb (A2,ofs+i,reg)
             ++ !ls
           done;
+        end
+        else begin
+          for i=s-1 to 1 do
+            ls :=
+              Unop (A0,Srl 4,A0)
+              ++ Sb (A0,ofs+i,reg)
+              ++ !ls
+          done;
+          ls := Sb (A0,ofs,reg) ++ !ls;
+        end;
         !ls
     end
 
@@ -188,6 +195,7 @@ and expr argpos sp =
   in function
   | Mconst n -> Li (A0,n)
   | Mla s -> La (A0,s)
+  
   (*| Mload (a,s,n,Maddr i) ->
     let ofs = add n (of_int argpos.(i)) in
     let sp = sp - ((s+3)/4)*4 in
@@ -202,7 +210,7 @@ and expr argpos sp =
       ++ Sw (A0,sp2,SP)
       ++ expr argpos (sp2-4) e
       ++ Lw (A1,sp2,SP)
-      ++ store a s (to_int n) A1 (sp-s)
+      ++ store a s (to_int n) A1 (sp2-s-4)
   | Maddr i -> Unop (A0,Addi (of_int argpos.(i)),FP)
   | Mcall (_,"putchar",el) ->
       expr argpos sp (List.hd el)
@@ -233,9 +241,9 @@ and expr argpos sp =
   | Mand (e1,e2) ->
       condition argpos sp e1
         (expr argpos sp e2 ++ Binop (A0,Sltu,ZERO,A0))
-        (Binop (A0,Sltu,ZERO,A0))
+        (Li (A0,zero))
   | Mor (e1,e2) ->
-      condition argpos sp e1 (Binop (A0,Sltu,ZERO,A0))
+      condition argpos sp e1 (Li (A0,one))
         (expr argpos sp e2 ++ (Binop (A0,Sltu,ZERO,A0)))
 
 and condition arg sp e b1 b2 = match e with
@@ -418,7 +426,9 @@ let fct
     Label f.ident
     ++ alloc_frame
     ++ body
-    ++ (if last body = Jr RA then Nop else exit)
+    ++ (if (try last body = Jr RA with Not_found -> false)
+          then Nop
+          else exit)
 
 let collect acc defrost f =
   if f.fid = "main"
@@ -456,7 +466,7 @@ let collect acc defrost f =
               then Nop
               else Unop (SP,Addi (of_int frame_ofs),SP))
       in
-      let body = instr [|0;-4|] (Nop,exit) f.Iselect.body in
+      let body = instr argpos (Nop,exit) f.Iselect.body in
       acc := Some (
         Label "main"
         ++ start
