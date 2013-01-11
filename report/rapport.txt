@@ -7,6 +7,9 @@ des différentes étapes de l'analyse.
 
 Lexeur -> Parseur -> Typeur -> Selection d'instructions (IS) -> MIPS
 
+
+-- Compostion du projet --
+
 Les fichiers qui composent mon programme sont (avec eventuellement
 une interface) :
   - error.ml - Fichier commun à tout le programme, de gestion d'erreurs
@@ -15,36 +18,104 @@ une interface) :
               sortie du parseur.
   - lexer.mll
   - parser.mly
+  - smap.ml, sset.ml - Implémentation d'un dictionnaire
   - typing.ml
   - iselect.ml
   - print_ist.ml - Affichage de l'arbre en sortie de l'IS
-  - mips.ml - Generation
+  - mips.ml - Génération de code MIPS
+  - print_mips.ml - Ecriture du résultat
   - main.ml
-\end{itemize}
+
+-- Usage --
+
+$ ./minic file.c
+
+Options :
+ -parse-only, -type-only
+ -batch : compiler plusieurs fichiers en une commande
+ -print : si -type-only est activé, affiche l'AST retourné
+ -ist : interrompt la compilation après IS et affiche l'arbre retourné
 
 
-\section{Choix et difficultés}
+-- Choix et difficultés --
 
-Je m'y suis pris assez tôt, donc j'avais globalement fini le
-lexeur et le parseur avant qu'ils ne soient abordés dans le cours.
+J'ai commencé la première partie assez tôt, donc j'avais globalement
+fini le lexeur et le parseur avant qu'ils ne soient abordés dans le cours.
 
 En cas d'ambiguïté dans le sujet, gcc a été la référence. (ainsi que pour
 les messages d'erreurs que j'ai repris)
 
-Pour la deuxième partie du sujet j'ai décidé d'utiliser la sélection
-d'instructions.
+J'ai perdu trop de temps dans la deuxième partie du projet. Initialement
+j'avais prévu d'implémenter les algorithmes d'optimisation vus en cours.
 
-J'ai d'abord modifié le typeur et l'AST :
-\begin{itemize}
-  \item les fonctions sont représentées par un type enregistrement,
-  pour plus de lisibilité
-  \item les variables globales et locales sont gérées différemment par le
-  typeur, en particulier seules les variables locales sont converties en
-  entiers.
-  \item les variables locales sont ramenées en en-tête des fonctions
-\end{itemize}
+Afin de rentrer dans les délais j'ai abandonné après la phase ERTL,
+et repris à partir de la sélection d'instructions.
+
+Une évaluation partielle est donc effectuée à cette étape, ainsi que
+l'organisation des champs des structures et unions.
+
+La structure de données utilisée pour représenter le code MIPS linéaire
+est inspirée d'une vue en TP.
 
 
-\end{document}
+-- Schéma de compilation --
 
+- Structures et unions
+
+Lors du typage les champs de type char sont rapprochés. On aurait pu
+faire de même avec les structures/unions non alignées mais cela
+serait laborieux.
+
+A la sortie de l'IS, les quasi-instructions load et store permettent
+d'éliminer la représentation explicite des types construits
+
+
+- Fonctions
+
+On adopte le schéma suivant sur la pile :
+
+ |    ...
+ -------------------
+ |  argument1        <- $fp
+ |    ...
+ |  local_var1
+ |    ...
+ |  saved $ra
+ |  saved $fp
+ |  empty word       <- $sp
+ |
+
+Du point de vue de l'appelé, les arguments et les variables locales sont
+confondus. Les registres $ra et $fp sont sauvegardés inconditionnelement.
+
+Tous les arguments d'une fonction sont placés sur la pile.
+La possibilité d'un déréférencement d'un pointeur sur ces arguments
+est contraignante.
+
+Le dernier résultat calculé est mis par défaut dans $a0, sauf si
+c'est une valeur d'une taille supérieure à 4 octets, auquel cas on la
+place sur la pile.
+Les résultats intermédiaires à sauvegarder sont aussi mis sur la pile.
+
+Les valeurs de retour des fonctions sont placées dans $a0 ou sur la pile
+en fonction de leur taille.
+
+
+- Appel
+
+1) Appelant avant l'appel
+Les arguments sont évalués de gauche à droite, et placés successivement
+sur la pile. $sp est ensuite déplacé au début de la frame de l'appelé.
+
+2) Appelé juste après l'appel
+$ra et $fp sont sauvegardés.
+$fp <- $sp
+$sp <- $fp + frame_size
+
+3) A la fin de la fonction
+On restore $ra, $fp.
+Eventuellement on place l'argument à sa place.
+
+4) Au retour
+On replace $sp en fin de frame de l'appelant
 

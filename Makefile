@@ -25,7 +25,6 @@ test: $(BIN) utest/ktst.c
 	./$(BIN) utest/ktst.c
 
 project:
-	mkdir xia-liyao
 	cp Makefile main.ml lexer.mll parser.mly ast.mli error.ml smap.ml sset.ml \
 		typing.ml typing.mli mipsofast.ml report/rapport.txt \
 	  test.sh iselect.ml iselect.mli mips.ml mips.mli \
