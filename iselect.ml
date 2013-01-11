@@ -452,11 +452,11 @@ let isconstr = function
       for i = 0 to Array.length s - 1 do
         if aligned s.(i)
           then begin
-            sz := ((!sz+3)/4)*4;
+            sz := round_4 !sz;
             align := true;
           end;
+        f_loc.(i) <- of_int !sz;
         sz := !sz + sizeof s.(i);
-        f_loc.(i) <- of_int (!sz-4);
       done;
       if !align
         then sz := round_4 !sz;
